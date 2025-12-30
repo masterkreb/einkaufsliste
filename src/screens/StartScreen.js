@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
+import { View, FlatList, StyleSheet, Text } from 'react-native';
 import { FAB, Searchbar, Portal, Dialog, TextInput, Button } from 'react-native-paper';
 import ListCard from '../components/ListCard';
 import { useIsFocused } from '@react-navigation/native';
@@ -117,7 +117,7 @@ export default function StartScreen({ route, navigation }) {
             isEditMode={isEditMode}
           />
         )}
-        ListEmptyComponent={<View><p style={{textAlign: 'center', marginTop: 20}}>Keine Listen vorhanden. Erstelle eine neue mit dem "+" Button!</p></View>}
+        ListEmptyComponent={<View><Text style={{textAlign: 'center', marginTop: 20}}>Keine Listen vorhanden. Erstelle eine neue mit dem "+" Button!</Text></View>}
       />
       <FAB style={styles.fab} icon="plus" onPress={handleAddList} />
 

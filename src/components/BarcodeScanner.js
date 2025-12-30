@@ -1,21 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
-import { Camera } from 'expo-camera';
-import { BarCodeScanner } from 'expo-barcode-scanner';
+import { Button } from 'react-native-paper';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import axios from 'axios';
 
 export default function BarcodeScannerComponent({ onScan }) {
-  const [hasPermission, setHasPermission] = useState(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
+    if (!permission) {
+      requestPermission();
+    }
+  }, [permission, requestPermission]);
 
-  const handleBarCodeScanned = async ({ type, data }) => {
+  const handleBarCodeScanned = async ({ data }) => {
     setScanned(true);
     try {
       const response = await axios.get(`https://world.openfoodfacts.org/api/v0/product/${data}.json`);
@@ -26,20 +25,21 @@ export default function BarcodeScannerComponent({ onScan }) {
     }
   };
 
-  if (hasPermission === null) {
+  if (!permission) {
     return <Text>Requesting for camera permission</Text>;
   }
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return <Text>No access to camera</Text>;
   }
 
   return (
     <View style={styles.container}>
-      <BarCodeScanner
-        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+      <CameraView
         style={StyleSheet.absoluteFillObject}
+        facing="back"
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       />
-      {scanned && <Button title={'Tap to Scan Again'} onPress={() => setScanned(false)} />}
+      {scanned && <Button onPress={() => setScanned(false)}>Tap to Scan Again</Button>}
     </View>
   );
 }

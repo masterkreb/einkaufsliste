@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
-import { IconButton, TextInput, Checkbox, Text } from 'react-native-paper';
+import { View, FlatList, StyleSheet, Modal } from 'react-native';
+import { IconButton, TextInput, Checkbox, Text, Button } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
 import { doc, getDoc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore';
+import BarcodeScannerComponent from '../components/BarcodeScanner';
 
 export default function ListEditScreen({ route, navigation }) {
   const { listId, listName: initialListName } = route.params;
@@ -10,6 +11,7 @@ export default function ListEditScreen({ route, navigation }) {
   const [newArticleName, setNewArticleName] = useState('');
   const [newArticleQuantity, setNewArticleQuantity] = useState(''); // State for the quantity
   const [editableListName, setEditableListName] = useState(initialListName);
+  const [isBarcodeModalVisible, setIsBarcodeModalVisible] = useState(false);
 
   useEffect(() => {
     setEditableListName(initialListName);
@@ -83,6 +85,11 @@ export default function ListEditScreen({ route, navigation }) {
     }
   };
 
+  const handleScan = (productName) => {
+    setNewArticleName(productName);
+    setIsBarcodeModalVisible(false);
+  };
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -117,8 +124,21 @@ export default function ListEditScreen({ route, navigation }) {
           onChangeText={setNewArticleName}
           style={styles.nameInput}
         />
+        <IconButton icon="barcode-scan" size={40} onPress={() => setIsBarcodeModalVisible(true)} style={styles.scanButton} />
         <IconButton icon="plus-circle" size={40} onPress={handleAddArticle} style={styles.addButton} />
       </View>
+
+      <Modal
+        visible={isBarcodeModalVisible}
+        onRequestClose={() => setIsBarcodeModalVisible(false)}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <View style={styles.modalContainer}>
+          <BarcodeScannerComponent onScan={handleScan} />
+          <Button onPress={() => setIsBarcodeModalVisible(false)}>Abbrechen</Button>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -152,5 +172,7 @@ const styles = StyleSheet.create({
   nameInput: {
     flex: 1,
   },
+  scanButton: { marginLeft: 8 },
   addButton: { marginLeft: 8 },
+  modalContainer: { flex: 1 },
 });
