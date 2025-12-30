@@ -21,6 +21,7 @@ const HeaderMenu = ({ navigation }) => {
   const closeMenu = () => setVisible(false);
 
   const handleAction = (action) => {
+    console.log('handleAction called with:', action);
     closeMenu();
     // We pass an action to the StartScreen via route params
     navigation.navigate('Start', { action: action, timestamp: Date.now() });

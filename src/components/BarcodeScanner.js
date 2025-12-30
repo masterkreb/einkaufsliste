@@ -18,10 +18,22 @@ export default function BarcodeScannerComponent({ onScan }) {
     setScanned(true);
     try {
       const response = await axios.get(`https://world.openfoodfacts.org/api/v0/product/${data}.json`);
-      const productName = response.data.product.product_name || 'Unbekanntes Produkt';
-      onScan(productName);
+      console.log('API Response:', response.data);
+      const product = response.data.product;
+      const productName = product.product_name || 'Unbekanntes Produkt';
+      const brands = product.brands || '';
+      const quantity = (product.quantity || product.net_weight || product.volume || '').replace(/(\d)([a-zA-Z])/g, '$1 $2'); // Add space between number and unit
+      const imageUrl = product.image_url || product.image_front_url || '';
+      
+      console.log('Extracted:', { productName, brands, quantity, imageUrl });
+      
+      // Combine info
+      const fullName = brands ? `${brands} ${productName}` : productName;
+      
+      onScan({ name: fullName, quantity, imageUrl });
     } catch (error) {
-      onScan('Unbekanntes Produkt');
+      console.log('API Error:', error);
+      onScan({ name: 'Unbekanntes Produkt', quantity: '', imageUrl: '' });
     }
   };
 

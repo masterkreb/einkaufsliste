@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
-import { View, FlatList, StyleSheet, Modal } from 'react-native';
-import { IconButton, TextInput, Checkbox, Text, Button } from 'react-native-paper';
+import { View, FlatList, StyleSheet, Modal, Pressable, Share } from 'react-native';
+import { IconButton, TextInput, Checkbox, Text, Button, Portal, Dialog, Snackbar } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
-import { doc, getDoc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot, arrayUnion, addDoc, collection } from 'firebase/firestore';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import BarcodeScannerComponent from '../components/BarcodeScanner';
 
 export default function ListEditScreen({ route, navigation }) {
@@ -11,8 +12,42 @@ export default function ListEditScreen({ route, navigation }) {
   const [articles, setArticles] = useState([]);
   const [newArticleName, setNewArticleName] = useState('');
   const [newArticleQuantity, setNewArticleQuantity] = useState(''); // State for the quantity
+  const [newArticleSize, setNewArticleSize] = useState(''); // State for the size from API
   const [editableListName, setEditableListName] = useState(initialListName);
   const [isBarcodeModalVisible, setIsBarcodeModalVisible] = useState(false);
+  const [isEditDialogVisible, setIsEditDialogVisible] = useState(false);
+  const [editingArticle, setEditingArticle] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editQuantity, setEditQuantity] = useState('');
+  const [editSize, setEditSize] = useState('');
+  const [isShareDialogVisible, setIsShareDialogVisible] = useState(false);
+  const [shareCode, setShareCode] = useState('');
+  const [isShared, setIsShared] = useState(false);
+  const [sharedListId, setSharedListId] = useState(null);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+
+  const getListRef = () => {
+    if (isShared && sharedListId) {
+      return doc(db, 'sharedLists', sharedListId);
+    } else {
+      return doc(db, `users/${auth.currentUser.uid}/lists`, listId);
+    }
+  };
+
+  const updateListName = React.useCallback(async () => {
+    if (editableListName.trim() === '' || editableListName === initialListName) {
+      setEditableListName(initialListName);
+      return;
+    }
+    const listRef = getListRef();
+    try {
+      await updateDoc(listRef, { name: editableListName, updatedAt: Date.now() });
+      navigation.setParams({ listName: editableListName });
+    } catch (error) {
+      console.error("Error updating list name: ", error);
+      setEditableListName(initialListName);
+    }
+  }, [editableListName, initialListName, listId, navigation]);
 
   useEffect(() => {
     setEditableListName(initialListName);
@@ -28,54 +63,83 @@ export default function ListEditScreen({ route, navigation }) {
           onBlur={updateListName}
         />
       ),
+      headerRight: () => (
+        <IconButton icon="account-plus" onPress={handleShareList} />
+      ),
     });
   }, [navigation, editableListName, updateListName]);
 
   useEffect(() => {
-    const listRef = doc(db, `users/${auth.currentUser.uid}/lists`, listId);
-    const unsubscribe = onSnapshot(listRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setArticles(data.articles || []);
-        if (data.name !== editableListName) {
-          setEditableListName(data.name);
-        }
+    const loadList = async () => {
+      const userListRef = doc(db, `users/${auth.currentUser.uid}/lists`, listId);
+      const userListSnap = await getDoc(userListRef);
+      if (userListSnap.exists()) {
+        const data = userListSnap.data();
+        console.log('User list data:', data);
+        setIsShared(data.isShared || false);
+        setSharedListId(data.sharedListId || data.shareCode || null);
+        setEditableListName(data.name);
+      } else {
+        console.log('User list not found');
       }
-    });
-    return unsubscribe;
+    };
+    loadList();
   }, [listId]);
 
-  const updateListName = React.useCallback(async () => {
-    if (editableListName.trim() === '' || editableListName === initialListName) {
-      setEditableListName(initialListName);
-      return;
+  useEffect(() => {
+    if (isShared && sharedListId) {
+      console.log('Loading shared list:', sharedListId);
+      const listRef = doc(db, 'sharedLists', sharedListId);
+      const unsubscribe = onSnapshot(listRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setArticles(data.articles || []);
+          if (data.name !== editableListName) {
+            setEditableListName(data.name);
+          }
+        } else {
+          console.log('Shared list not found');
+        }
+      });
+      return () => unsubscribe();
+    } else if (!isShared) {
+      console.log('Loading user list:', listId);
+      const listRef = doc(db, `users/${auth.currentUser.uid}/lists`, listId);
+      const unsubscribe = onSnapshot(listRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setArticles(data.articles || []);
+          if (data.name !== editableListName) {
+            setEditableListName(data.name);
+          }
+        }
+      });
+      return () => unsubscribe();
+    } else {
+      console.log('No list to load: isShared=', isShared, 'sharedListId=', sharedListId);
     }
-    const listRef = doc(db, `users/${auth.currentUser.uid}/lists`, listId);
-    try {
-      await updateDoc(listRef, { name: editableListName, updatedAt: Date.now() });
-      navigation.setParams({ listName: editableListName });
-    } catch (error) {
-      console.error("Error updating list name: ", error);
-      setEditableListName(initialListName);
-    }
-  }, [editableListName, initialListName, listId, navigation]);
+  }, [listId, isShared, sharedListId]);
 
   const handleAddArticle = async () => {
+    console.log('handleAddArticle called with name:', newArticleName);
     if (newArticleName.trim() === '') return;
     const newArticle = {
       id: `item-${Date.now()}`,
       name: newArticleName,
-      quantity: newArticleQuantity.trim() || '1', // Add quantity, default to 1
+      quantity: newArticleQuantity.trim() || '1', // Anzahl
+      size: newArticleSize || '', // Packungsgröße von API
       completed: false,
     };
-    const listRef = doc(db, `users/${auth.currentUser.uid}/lists`, listId);
+    const listRef = getListRef();
     await updateDoc(listRef, { articles: arrayUnion(newArticle) });
     setNewArticleName('');
-    setNewArticleQuantity(''); // Reset quantity field
+    setNewArticleQuantity('');
+    setNewArticleSize('');
   };
 
   const handleToggleArticle = async (articleToToggle) => {
-    const listRef = doc(db, `users/${auth.currentUser.uid}/lists`, listId);
+    console.log('handleToggleArticle called for:', articleToToggle.name);
+    const listRef = getListRef();
     const docSnap = await getDoc(listRef);
     if (docSnap.exists()) {
       const currentArticles = docSnap.data().articles || [];
@@ -90,9 +154,70 @@ export default function ListEditScreen({ route, navigation }) {
     }
   };
 
-  const handleScan = (productName) => {
-    setNewArticleName(productName);
+  const handleScan = (productInfo) => {
+    setNewArticleName(productInfo.name);
+    setNewArticleSize(productInfo.quantity); // Set size from API
     setIsBarcodeModalVisible(false);
+  };
+
+  const openEditDialog = (article) => {
+    setEditingArticle(article);
+    setEditName(article.name);
+    setEditQuantity(article.quantity);
+    setEditSize(article.size || '');
+    setIsEditDialogVisible(true);
+  };
+
+  const handleEditArticle = async () => {
+    if (!editingArticle) return;
+    const listRef = getListRef();
+    const docSnap = await getDoc(listRef);
+    if (docSnap.exists()) {
+      const currentArticles = docSnap.data().articles || [];
+      const updatedArticles = currentArticles.map(article =>
+        article.id === editingArticle.id ? { ...article, name: editName, quantity: editQuantity, size: editSize } : article
+      );
+      await updateDoc(listRef, { articles: updatedArticles });
+    }
+    setIsEditDialogVisible(false);
+    setEditingArticle(null);
+  };
+
+  const handleShareList = async () => {
+    const userListRef = doc(db, `users/${auth.currentUser.uid}/lists`, listId);
+    const docSnap = await getDoc(userListRef);
+    let code = docSnap.data()?.shareCode;
+    if (!code) {
+      code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      // Erstelle sharedList
+      const sharedListData = {
+        ...docSnap.data(),
+        shareCode: code,
+        members: [auth.currentUser.uid],
+        createdBy: auth.currentUser.uid,
+        createdAt: Date.now()
+      };
+      const sharedListRef = await addDoc(collection(db, 'sharedLists'), sharedListData);
+      // Update userList mit sharedListId
+      await updateDoc(userListRef, { shareCode: code, isShared: true, sharedListId: sharedListRef.id });
+    }
+    setShareCode(code);
+    setIsShareDialogVisible(true);
+  };
+
+  const handleShareCode = async () => {
+    try {
+      await Share.share({
+        message: `Tritt meiner Einkaufsliste "${editableListName}" bei! Code: ${shareCode}`,
+      });
+    } catch (error) {
+      console.log('Share error:', error);
+    }
+  };
+
+  const handleCopyCode = async () => {
+    await Clipboard.setStringAsync(shareCode);
+    setSnackbarVisible(true);
   };
 
   return (
@@ -109,8 +234,9 @@ export default function ListEditScreen({ route, navigation }) {
             {/* Display quantity and name */}
             <Text style={styles.quantityText}>{item.quantity}x</Text>
             <Text style={[styles.articleText, item.completed && styles.articleTextCompleted]}>
-              {item.name}
+              {item.name}{item.size ? ` (${item.size})` : ''}
             </Text>
+            <IconButton icon="pencil" size={20} onPress={() => openEditDialog(item)} style={styles.editButton} />
           </View>
         )}
       />
@@ -130,7 +256,7 @@ export default function ListEditScreen({ route, navigation }) {
           style={styles.nameInput}
         />
         <IconButton icon="barcode-scan" size={40} onPress={() => setIsBarcodeModalVisible(true)} style={styles.scanButton} />
-        <IconButton icon="plus-circle" size={40} onPress={handleAddArticle} style={styles.addButton} />
+        <IconButton icon="plus-circle" size={40} onPress={() => { console.log('Plus button pressed'); handleAddArticle(); }} style={styles.addButton} />
       </View>
 
       <Modal
@@ -144,6 +270,58 @@ export default function ListEditScreen({ route, navigation }) {
           <Button onPress={() => setIsBarcodeModalVisible(false)}>Abbrechen</Button>
         </View>
       </Modal>
+
+      <Portal>
+        <Dialog visible={isEditDialogVisible} onDismiss={() => setIsEditDialogVisible(false)}>
+          <Dialog.Title>Artikel bearbeiten</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              label="Name"
+              value={editName}
+              onChangeText={setEditName}
+              style={{ marginBottom: 8 }}
+            />
+            <TextInput
+              label="Anzahl"
+              value={editQuantity}
+              onChangeText={setEditQuantity}
+              keyboardType="numeric"
+              style={{ marginBottom: 8 }}
+            />
+            <TextInput
+              label="Größe (optional)"
+              value={editSize}
+              onChangeText={setEditSize}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setIsEditDialogVisible(false)}>Abbrechen</Button>
+            <Button onPress={handleEditArticle}>Speichern</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog visible={isShareDialogVisible} onDismiss={() => setIsShareDialogVisible(false)}>
+          <Dialog.Title>Liste freigeben</Dialog.Title>
+          <Dialog.Content>
+            <Text>Teile diesen Code, damit Freunde beitreten können:</Text>
+            <Text style={{ fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginVertical: 10 }}>{shareCode}</Text>
+            <Button mode="contained" onPress={handleCopyCode} style={{ marginTop: 10 }}>
+              Code kopieren
+            </Button>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setIsShareDialogVisible(false)}>Schließen</Button>
+            <Button onPress={handleShareCode}>Teilen</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={2000}
+      >
+        Code kopiert!
+      </Snackbar>
     </View>
   );
 }
@@ -180,4 +358,5 @@ const styles = StyleSheet.create({
   scanButton: { marginLeft: 8 },
   addButton: { marginLeft: 8 },
   modalContainer: { flex: 1 },
+  editButton: { marginLeft: 'auto' },
 });
