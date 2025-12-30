@@ -3,6 +3,7 @@ import { View, FlatList, StyleSheet, Modal } from 'react-native';
 import { IconButton, TextInput, Checkbox, Text, Button } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
 import { doc, getDoc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore';
+import * as Haptics from 'expo-haptics';
 import BarcodeScannerComponent from '../components/BarcodeScanner';
 
 export default function ListEditScreen({ route, navigation }) {
@@ -82,6 +83,10 @@ export default function ListEditScreen({ route, navigation }) {
         article.id === articleToToggle.id ? { ...article, completed: !article.completed } : article
       );
       await updateDoc(listRef, { articles: updatedArticles });
+      // Vibrate when marking as completed
+      if (!articleToToggle.completed) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     }
   };
 
