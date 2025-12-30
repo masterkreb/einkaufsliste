@@ -1,0 +1,26 @@
+Modul 335 - Kompetenzen										
+										
+Name:	Imad Chatila									
+Datum:	01.12.2025									
+							1	2	3	4
+Handlungsziele und Handlungskompetenzen		max	forc.	done	P	G	L	K	J	R
+										
+1	Vorgabe analysieren, Funktionalität und Storyboard entwerfen. (Dokumentation)									
+1.a	Mobile App -Anforderungen und Planung beschreiben.		 
+1.b	Sensoren und/oder Local Storage/DB beschreiben.		 
+1.c	Testplan erstellen (alle relevanten Anwendungsfälle als Tesfälle geplant).	 
+
+2	Lösungskonzept für die Applikation erarbeiten. (Dokumentation)									
+2.a	Ich kenne ein Framework wie React-Native, Flutter oder Swift-UI und kann dafür eine Mobile App aufbauen und ein Lösungskonzept erarbeiten.		 
+2.b	Ich kenne spezielle Funktionen, sowie Aktoren und Sensoren (z.B. Geolocation, Bewegungssensoren, Spracherkennung und –generierung) und kann diese in ein Lösungskonzept integreieren oder Ich kenne Möglichkeiten von Persistenzlösungen (SQL, noSQL) von mobilen Plattformen (Online-/Offline Szenarien) und kann diese in Lösungskonzept integrieren. (2 Elemente geplant)		 	 
+
+3	Mobile-Applikation mit einer gängigen Entwicklungsumgebung programmieren. (Code im Projekt)									
+3.a	Mobile App - funktionalität und MockUps wie geplant umgesetzt. (Ziele erreicht!)		 
+3.b	Mobile App - die Sensoren wie geplant umgesetzt. (Ziele erreicht).	 
+
+4	Veröffentlichung der Applikation auf einer gängigen Plattform planen und nötige Schritte festhalten. (Dokumentation)									
+4.a	Ich kenne die nötigen Schritte zur Veröffentlichung einer App und kann diese Schritte beschreiben.		 
+4.b	Die Mobile-App sit als fertig paketierte .apk Datei soweit vorbereitet und kann publiziert werden.		
+
+5	Mobile-Applikation gemäss Testplan überprüfen, Testergebnisse festhalten und allenfalls erforderliche Korrekturen vornehmen. (Dokumentation & Code)									
+5.a	Mobile App gemäss Testplan überprüfen (alle relevanten Anwendungsfälle getestet) und erforderliche Korrekturen vorgenommen.		
