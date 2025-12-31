@@ -1,16 +1,18 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { View, FlatList, StyleSheet, Text } from 'react-native';
-import { FAB, Searchbar, Portal, Dialog, TextInput, Button, Card, Title, Paragraph, IconButton, Subheading } from 'react-native-paper';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
+import { View, FlatList, StyleSheet, Text, BackHandler } from 'react-native';
+import { FAB, Portal, Dialog, TextInput, Button, Card, Title, Paragraph, IconButton, Subheading, Searchbar } from 'react-native-paper';
 import { useIsFocused } from '@react-navigation/native';
 import { auth, db } from '../services/firebase';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, arrayUnion } from 'firebase/firestore';
 
+import HeaderMenu from '../components/HeaderMenu';
+
 export default function StartScreen({ route, navigation }) {
   const [lists, setLists] = useState([]);
   const [filteredLists, setFilteredLists] = useState([]);
+  
   const [isEditMode, setIsEditMode] = useState(false);
-  const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
   const [isJoinDialogVisible, setIsJoinDialogVisible] = useState(false);
@@ -23,19 +25,57 @@ export default function StartScreen({ route, navigation }) {
   const isFocused = useIsFocused();
   const user = auth.currentUser;
 
-  const sharedListUnsubscribersRef = useRef({});
+  const sharedListUnsubscribersRef = React.useRef({});
 
   useEffect(() => {
     const { action, timestamp } = route.params || {};
     if (timestamp && action) {
       switch (action) {
-        case 'edit': setIsEditMode(prev => !prev); setIsSearchVisible(false); break;
-        case 'search': setIsSearchVisible(prev => !prev); setIsEditMode(false); break;
+        case 'edit': toggleEditMode(); break;
         case 'join': setIsJoinDialogVisible(true); break;
       }
       navigation.setParams({ action: null, timestamp: null });
     }
-  }, [route.params?.action, route.params?.timestamp, navigation]);
+  }, [route.params?.timestamp]);
+
+  useEffect(() => {
+    const backAction = () => {
+      if (isEditMode) {
+        toggleEditMode();
+        return true;
+      }
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [isEditMode]);
+
+  const toggleEditMode = () => {
+    const newEditMode = !isEditMode;
+    setIsEditMode(newEditMode);
+    // When entering edit mode, clear the search query for a cleaner UI
+    if (newEditMode) {
+      setSearchQuery('');
+    }
+  };
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: 'Einkaufslisten',
+      headerLeft: () => null,
+      headerRight: () => {
+        if (isEditMode) {
+          return <Button onPress={toggleEditMode}>Fertig</Button>;
+        }
+        return <HeaderMenu navigation={navigation} />;
+      },
+    });
+  }, [navigation, isEditMode]);
 
   useEffect(() => {
     if (!isFocused || !user) {
@@ -84,7 +124,6 @@ export default function StartScreen({ route, navigation }) {
     };
 }, [isFocused, user]);
 
-
   useEffect(() => {
     if (searchQuery) {
       const filtered = lists.filter(list => list.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -112,35 +151,36 @@ export default function StartScreen({ route, navigation }) {
 
   const handleJoinList = async () => {
     const code = joinCode.trim().toUpperCase();
-    if (!code || !user) return;
+    if (!code || !user) {
+        setIsJoinDialogVisible(false);
+        setJoinCode('');
+        return;
+    }
 
     const sharedListRef = doc(db, 'sharedLists', code);
 
     try {
+      const sharedListSnap = await getDoc(sharedListRef);
+      if (!sharedListSnap.exists()) {
+          throw new Error("Liste nicht gefunden");
+      }
+      
+      const sharedList = sharedListSnap.data();
       await updateDoc(sharedListRef, {
         members: arrayUnion(user.uid)
       });
+      
+      await setDoc(doc(db, `users/${user.uid}/lists`, code), {
+        name: sharedList.name,
+        isShared: true,
+        sharedListId: code,
+        joinedAt: Date.now()
+      });
+      alert('Liste erfolgreich beigetreten!');
 
-      const sharedListSnap = await getDoc(sharedListRef);
-      if (sharedListSnap.exists()) {
-        const sharedList = sharedListSnap.data();
-        await setDoc(doc(db, `users/${user.uid}/lists`, code), {
-          name: sharedList.name,
-          isShared: true,
-          sharedListId: code,
-          joinedAt: Date.now()
-        });
-        alert('Liste erfolgreich beigetreten!');
-      } else {
-          throw new Error("Konnte die Liste nach dem Beitreten nicht finden.");
-      }
     } catch (error) {
       console.error('Error joining list:', error);
-      if (error.code === 'permission-denied' || error.code === 'not-found') {
-           alert('Fehler beim Beitreten. Prüfe den Freigabecode. Er ist entweder falsch oder die Liste existiert nicht mehr.');
-      } else {
-           alert('Ein unerwarteter Fehler ist aufgetreten.');
-      }
+      alert('Fehler beim Beitreten. Prüfe den Freigabecode. Er ist entweder falsch oder die Liste existiert nicht mehr.');
     } finally {
         setIsJoinDialogVisible(false);
         setJoinCode('');
@@ -154,9 +194,10 @@ export default function StartScreen({ route, navigation }) {
   };
 
   const handleRenameList = async () => {
-    if (!listToRename || !newListName.trim() || newListName.trim() === listToRename.name) {
-      setIsRenameDialogVisible(false);
-      return;
+    const trimmedName = newListName.trim();
+    if (!listToRename || !trimmedName) {
+        setIsRenameDialogVisible(false);
+        return;
     }
     
     if (listToRename.isShared) {
@@ -165,9 +206,14 @@ export default function StartScreen({ route, navigation }) {
         return;
     }
 
+    if (trimmedName === listToRename.name) {
+        setIsRenameDialogVisible(false);
+        return;
+    }
+
     try {
         const userListRef = doc(db, `users/${user.uid}/lists`, listToRename.id);
-        await updateDoc(userListRef, { name: newListName.trim(), updatedAt: Date.now() });
+        await updateDoc(userListRef, { name: trimmedName, updatedAt: Date.now() });
     } catch (error) {
         console.error("Error renaming private list:", error);
         alert("Fehler beim Umbenennen der Liste.");
@@ -241,15 +287,13 @@ export default function StartScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      {isSearchVisible && (
-        <Searchbar
-          placeholder="Listen durchsuchen..."
-          onChangeText={setSearchQuery}
-          value={searchQuery}
-          style={styles.searchbar}
-          onIconPress={() => setIsSearchVisible(false)}
-        />
-      )}
+      <Searchbar
+        placeholder="Listen durchsuchen..."
+        onChangeText={setSearchQuery}
+        value={searchQuery}
+        style={styles.searchBar}
+        onIconPress={() => {if (isEditMode) toggleEditMode()}} // Exit edit mode when search is used
+      />
       <FlatList
         data={filteredLists}
         keyExtractor={(item) => item.id}
@@ -301,7 +345,11 @@ export default function StartScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   fab: { position: 'absolute', margin: 16, right: 0, bottom: 0 },
-  searchbar: { margin: 8 },
+  searchBar: {
+    marginHorizontal: 10,
+    marginTop: 10,
+    marginBottom: 5,
+  },
   card: {
     marginVertical: 5,
     marginHorizontal: 10,
@@ -314,7 +362,7 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     flex: 1, 
-    paddingRight: 10, // Make some space for edit buttons
+    paddingRight: 10,
   },
   actionsContainer: {
     flexDirection: 'row',

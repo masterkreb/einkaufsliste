@@ -1,71 +1,36 @@
+
 import React, { useState, useEffect } from 'react';
-import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { auth } from '../services/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { Menu, IconButton, Divider } from 'react-native-paper';
+import { onAuthStateChanged } from 'firebase/auth';
 
+// Import screen components
 import StartScreen from '../screens/StartScreen';
 import ListEditScreen from '../screens/ListEditScreen';
 import ArticleDetailsScreen from '../screens/ArticleDetailsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import LoadingScreen from '../screens/LoadingScreen';
 
+// Import custom components
+import HeaderMenu from '../components/HeaderMenu';
+
 const Stack = createStackNavigator();
-
-// This component renders the menu in the header
-const HeaderMenu = ({ navigation }) => {
-  const [visible, setVisible] = useState(false);
-  const openMenu = () => setVisible(true);
-  const closeMenu = () => setVisible(false);
-
-  const handleAction = (action) => {
-    console.log('handleAction called with:', action);
-    closeMenu();
-    // We pass an action to the StartScreen via route params
-    navigation.navigate('Start', { action: action, timestamp: Date.now() });
-  };
-  
-  const handleLogout = async () => {
-    closeMenu();
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Error signing out: ", error);
-    }
-  };
-
-  return (
-    <View style={{ flexDirection: 'row' }}>
-      <Menu
-        visible={visible}
-        onDismiss={closeMenu}
-        anchor={<IconButton icon="dots-vertical" onPress={openMenu} color="#000" />}
-      >
-        <Menu.Item onPress={() => handleAction('edit')} title="Bearbeiten" />
-        <Menu.Item onPress={() => handleAction('search')} title="Suche" />
-        <Menu.Item onPress={() => handleAction('join')} title="Beitreten" />
-        <Divider />
-        <Menu.Item onPress={handleLogout} title="Logout" />
-      </Menu>
-    </View>
-  );
-};
-
 
 export default function AppNavigator() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Observer for user authentication state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
     });
-    return () => unsubscribe();
+    return () => unsubscribe(); // Cleanup subscription on unmount
   }, []);
 
+  // Display a loading screen while checking auth state
   if (loading) {
     return <LoadingScreen />;
   }
@@ -79,21 +44,31 @@ export default function AppNavigator() {
             <Stack.Screen
               name="Start"
               component={StartScreen}
+              // The header is now dynamically controlled within StartScreen itself
+              // to allow for context-aware buttons (e.g., "Done" in edit mode).
               options={({ navigation }) => ({
                 title: 'Einkaufslisten',
+                // The default headerRight is set here, but can be overridden by StartScreen
                 headerRight: () => <HeaderMenu navigation={navigation} />,
               })}
-              initialParams={{ action: 'none' }}
             />
-            <Stack.Screen name="ListEdit" component={ListEditScreen} options={{ title: 'Liste bearbeiten' }} />
-            <Stack.Screen name="ArticleDetails" component={ArticleDetailsScreen} options={{ title: 'Artikeldetails' }} />
+            <Stack.Screen 
+              name="ListEdit" 
+              component={ListEditScreen} 
+              options={{ title: 'Liste bearbeiten' }}
+            />
+            <Stack.Screen 
+              name="ArticleDetails" 
+              component={ArticleDetailsScreen} 
+              options={{ title: 'Artikeldetails' }}
+            />
           </>
         ) : (
           // No user is signed in, show the login screen
           <Stack.Screen 
             name="Login"
             component={LoginScreen} 
-            options={{ headerShown: false }}
+            options={{ headerShown: false }} // Hide header for the login screen
           />
         )}
       </Stack.Navigator>
