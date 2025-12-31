@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, SafeAreaView, LayoutAnimation, UIManager, KeyboardAvoidingView } from 'react-native';
+import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, SafeAreaView, LayoutAnimation, UIManager, Animated } from 'react-native';
 import { IconButton, TextInput, Checkbox, Text, Button, Portal, Dialog, Snackbar } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
 import { doc, getDoc, updateDoc, onSnapshot, arrayUnion, setDoc } from 'firebase/firestore';
@@ -29,8 +29,28 @@ export default function ListEditScreen({ route, navigation }) {
   const [isShared, setIsShared] = useState(route.params.isShared || false);
   const [sharedListId, setSharedListId] = useState(route.params.sharedListId || null);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const nameInputRef = useRef(null);
+  const isProcessingScan = useRef(false);
+  const keyboardOffset = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const keyboardWillShow = (e) => {
+        Animated.timing(keyboardOffset, { toValue: e.endCoordinates.height, duration: e.duration, useNativeDriver: false }).start();
+    };
+    const keyboardWillHide = (e) => {
+        Animated.timing(keyboardOffset, { toValue: 0, duration: e.duration, useNativeDriver: false }).start();
+    };
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(showEvent, keyboardWillShow);
+    const hideSubscription = Keyboard.addListener(hideEvent, keyboardWillHide);
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [keyboardOffset]);
 
   useEffect(() => {
     const userListRef = doc(db, `users/${auth.currentUser.uid}/lists`, listId);
@@ -92,16 +112,28 @@ export default function ListEditScreen({ route, navigation }) {
       : doc(db, `users/${auth.currentUser.uid}/lists`, listId);
   };
 
-  const handleAddArticle = async () => {
-    if (newArticleName.trim() === '') {
-        Keyboard.dismiss();
-        return;
-    }
-    const newArticle = { id: `item-${Date.now()}`, name: newArticleName.trim(), quantity: newArticleQuantity.trim() || '1', size: '', completed: false };
+  const addArticleToList = async (article) => {
+    if (!article || !article.name || article.name.trim() === '') return;
+
+    const newArticle = {
+        id: `item-${Date.now()}`,
+        name: article.name.trim(),
+        quantity: article.quantity.trim() || '1',
+        size: article.size ? article.size.trim() : '',
+        completed: false
+    };
+    
     await updateDoc(getListRef(), { articles: arrayUnion(newArticle) });
-    setNewArticleName('');
-    setNewArticleQuantity('1');
-    Keyboard.dismiss();
+    return newArticle;
+  };
+
+  const handleAddArticle = async () => {
+    const article = await addArticleToList({ name: newArticleName, quantity: newArticleQuantity, size: '' });
+    if (article) {
+      setNewArticleName('');
+      setNewArticleQuantity('1');
+      Keyboard.dismiss();
+    }
   };
 
   const handleToggleArticle = async (articleToToggle) => {
@@ -165,11 +197,38 @@ export default function ListEditScreen({ route, navigation }) {
     }
   };
 
-  const handleScan = (productInfo) => {
-    setNewArticleName(productInfo.name);
-    setNewArticleQuantity(productInfo.quantity || '1');
+  const handleScan = async (scannedInfo) => {
+    if (isProcessingScan.current) return;
+    isProcessingScan.current = true;
+    
     setIsBarcodeModalVisible(false);
+
+    let name = scannedInfo.name;
+    let size = '';
+    const weightRegex = /(\d+\s*(g|ml|l|kg))/i;
+    const match = name.match(weightRegex);
+
+    if (match) {
+        size = match[1].toLowerCase();
+        name = name.replace(weightRegex, '').replace(/\s+/g, ' ').trim();
+    }
+
+    const article = await addArticleToList({ 
+        name: name, 
+        quantity: scannedInfo.quantity || '1', 
+        size: size 
+    });
+    
+    if (article) {
+        setSnackbarMessage(`'${article.name}${article.size ? ` (${article.size})` : ''}' hinzugefügt`);
+        setSnackbarVisible(true);
+    }
   };
+  
+  const openBarcodeScanner = () => {
+    isProcessingScan.current = false;
+    setIsBarcodeModalVisible(true);
+  }
 
   const handleShareCode = async () => {
     try {
@@ -181,6 +240,7 @@ export default function ListEditScreen({ route, navigation }) {
 
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(shareCode);
+    setSnackbarMessage('Code kopiert!');
     setSnackbarVisible(true);
   };
 
@@ -197,7 +257,7 @@ export default function ListEditScreen({ route, navigation }) {
           />
           <Text style={styles.quantityText}>{item.quantity}x</Text>
           <Text style={[styles.articleText, item.completed && styles.articleTextCompleted]}>
-            {item.name}
+             {item.name}{item.size ? ` (${item.size})` : ''}
           </Text>
           <IconButton
             icon={isEditing ? "chevron-up" : "pencil"}
@@ -226,23 +286,19 @@ export default function ListEditScreen({ route, navigation }) {
         data={articles}
         keyExtractor={(item) => item.id}
         renderItem={renderArticle}
-        contentContainerStyle={{ paddingBottom: 60 }}
+        contentContainerStyle={{ paddingBottom: 80 }}
       />
       
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"} 
-        keyboardVerticalOffset={90}
-      >
-        <View style={styles.inputContainer}>
+      <Animated.View style={[styles.inputContainer, { bottom: keyboardOffset }]}>
+        <SafeAreaView style={{flexDirection: 'row'}} edges={['left', 'right']}>
             <TextInput label="Menge" value={newArticleQuantity} onChangeText={setNewArticleQuantity} style={styles.quantityInput} keyboardType="numeric" />
-            <TextInput ref={nameInputRef} label="Neuer Artikel" value={newArticleName} onChangeText={setNewArticleName} style={styles.nameInput} onSubmitEditing={handleAddArticle} right={<TextInput.Icon icon="barcode-scan" onPress={() => setIsBarcodeModalVisible(true)} />} />
-        </View>
-      </KeyboardAvoidingView>
+            <TextInput ref={nameInputRef} label="Neuer Artikel" value={newArticleName} onChangeText={setNewArticleName} style={styles.nameInput} onSubmitEditing={handleAddArticle} right={<TextInput.Icon icon="barcode-scan" onPress={openBarcodeScanner} />} />
+        </SafeAreaView>
+      </Animated.View>
 
       <Modal visible={isBarcodeModalVisible} onRequestClose={() => setIsBarcodeModalVisible(false)} animationType="slide" presentationStyle="fullScreen">
         <View style={styles.modalContainer}>
-          <BarcodeScannerComponent onScan={handleScan} />
-          <Button onPress={() => setIsBarcodeModalVisible(false)}>Abbrechen</Button>
+          <BarcodeScannerComponent onScan={handleScan} onClose={() => setIsBarcodeModalVisible(false)} />
         </View>
       </Modal>
 
@@ -260,7 +316,7 @@ export default function ListEditScreen({ route, navigation }) {
           </Dialog.Actions>
         </Dialog>
       </Portal>
-      <Snackbar visible={snackbarVisible} onDismiss={() => setSnackbarVisible(false)} duration={2000}>Code kopiert!</Snackbar>
+      <Snackbar visible={snackbarVisible} onDismiss={() => setSnackbarVisible(false)} duration={3000}>{snackbarMessage}</Snackbar>
     </SafeAreaView>
   );
 }
@@ -277,7 +333,7 @@ const styles = StyleSheet.create({
   editContainer: { padding: 16, backgroundColor: '#fafafa' },
   editInput: { backgroundColor: '#f0f0f0' },
   editActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', padding: 8, borderTopWidth: 1, borderTopColor: '#ddd', backgroundColor: 'white' },
+  inputContainer: { position: 'absolute', left: 0, right: 0, padding: 8, borderTopWidth: 1, borderTopColor: '#ddd', backgroundColor: 'white' },
   quantityInput: { width: 80, marginRight: 8 },
   nameInput: { flex: 1 },
   modalContainer: { flex: 1 },
