@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, SafeAreaView, LayoutAnimation, UIManager, Animated, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
-import { IconButton, TextInput, Checkbox, Text, Button, Portal, Dialog, Snackbar, Icon } from 'react-native-paper';
+import { Menu, IconButton, TextInput, Checkbox, Text, Button, Portal, Dialog, Snackbar, Icon } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
 import { doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, setDoc } from 'firebase/firestore';
 import * as Haptics from 'expo-haptics';
@@ -31,6 +31,11 @@ export default function ListEditScreen({ route, navigation }) {
   const [sharedListId, setSharedListId] = useState(route.params.sharedListId || null);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  // State for bulk-edit mode
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedArticles, setSelectedArticles] = useState([]);
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
 
   const nameInputRef = useRef(null);
   const isProcessingScan = useRef(false);
@@ -90,7 +95,7 @@ export default function ListEditScreen({ route, navigation }) {
         setEditableListName(initialListName); 
         return;
     }
-    const ref = isShared && sharedListId ? doc(db, 'sharedLists', sharedListId) : doc(db, `users/${auth.currentUser.uid}/lists`, listId);
+    const ref = getListRef();
     try {
         await updateDoc(ref, { name: newName });
         navigation.setParams({ listName: newName });
@@ -98,24 +103,41 @@ export default function ListEditScreen({ route, navigation }) {
         console.error("[ERROR] updateListName:", error);
         setEditableListName(initialListName);
     }
-  }, [editableListName, isShared, sharedListId, listId, navigation, initialListName]);
+  }, [editableListName, getListRef, listId, navigation, initialListName]);
 
-  useLayoutEffect(() => {
+   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: () => <TextInput value={editableListName} onChangeText={setEditableListName} style={styles.headerInput} onBlur={updateListName}/>,
-      headerRight: () => <IconButton icon="account-plus" onPress={handleShareList} />,
+      headerTitle: isEditMode ? '' : () => <TextInput value={editableListName} onChangeText={setEditableListName} style={styles.headerInput} onBlur={updateListName}/>,
+      headerLeft: isEditMode ? () => <Button onPress={() => { setIsEditMode(false); setSelectedArticles([]); }}>Abbrechen</Button> : undefined,
+      headerRight: () => {
+        if (isEditMode) {
+          return <Button onPress={handleBulkDelete} disabled={selectedArticles.length === 0}>Löschen</Button>;
+        }
+        return (
+          <View style={{ flexDirection: 'row' }}>
+            <IconButton icon="account-plus" onPress={handleShareList} />
+            <Menu
+              visible={isMenuVisible}
+              onDismiss={() => setIsMenuVisible(false)}
+              anchor={<IconButton icon="dots-vertical" onPress={() => setIsMenuVisible(true)} />}
+            >
+              <Menu.Item onPress={() => { setIsEditMode(true); setIsMenuVisible(false); }} title="Artikel auswählen" />
+              <Menu.Item onPress={handleDeleteCompleted} title="Erledigte löschen" />
+            </Menu>
+          </View>
+        );
+      },
     });
-  }, [navigation, editableListName, updateListName]);
+  }, [navigation, editableListName, updateListName, isEditMode, selectedArticles, isMenuVisible]);
 
-  const getListRef = () => {
+  const getListRef = useCallback(() => {
     return isShared && sharedListId
       ? doc(db, 'sharedLists', sharedListId)
       : doc(db, `users/${auth.currentUser.uid}/lists`, listId);
-  };
+  }, [isShared, sharedListId, listId]);
 
   const addArticleToList = async (article) => {
     if (!article || !article.name || article.name.trim() === '') return;
-
     const newArticle = {
         id: `item-${Date.now()}`,
         name: article.name.trim(),
@@ -123,7 +145,6 @@ export default function ListEditScreen({ route, navigation }) {
         size: article.size ? article.size.trim() : '',
         completed: false
     };
-    
     await updateDoc(getListRef(), { articles: arrayUnion(newArticle) });
     return newArticle;
   };
@@ -159,7 +180,47 @@ export default function ListEditScreen({ route, navigation }) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
+  const handleBulkDelete = async () => {
+    const listRef = getListRef();
+    const docSnap = await getDoc(listRef);
+    if (docSnap.exists()) {
+        const currentArticles = docSnap.data().articles;
+        const updatedArticles = currentArticles.filter(article => !selectedArticles.includes(article.id));
+        await updateDoc(listRef, { articles: updatedArticles });
+        setSnackbarMessage(`${selectedArticles.length} Artikel gelöscht`);
+        setSnackbarVisible(true);
+        setIsEditMode(false);
+        setSelectedArticles([]);
+    }
+  };
+  
+  const handleDeleteCompleted = async () => {
+    setIsMenuVisible(false);
+    const listRef = getListRef();
+    const docSnap = await getDoc(listRef);
+    if (docSnap.exists()) {
+        const currentArticles = docSnap.data().articles;
+        const updatedArticles = currentArticles.filter(article => !article.completed);
+        const numDeleted = currentArticles.length - updatedArticles.length;
+        if (numDeleted > 0) {
+            await updateDoc(listRef, { articles: updatedArticles });
+            setSnackbarMessage(`${numDeleted} erledigte Artikel gelöscht`);
+        } else {
+            setSnackbarMessage('Keine erledigten Artikel gefunden');
+        }
+        setSnackbarVisible(true);
+    }
+  };
+
+  const handleToggleSelect = (articleId) => {
+    const newSelection = selectedArticles.includes(articleId)
+      ? selectedArticles.filter(id => id !== articleId)
+      : [...selectedArticles, articleId];
+    setSelectedArticles(newSelection);
+  };
+
   const handleToggleEdit = (article) => {
+    if (isEditMode) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     if (editingArticleId === article.id) {
       setEditingArticleId(null);
@@ -186,6 +247,7 @@ export default function ListEditScreen({ route, navigation }) {
   };
 
   const handleShareList = async () => {
+    if (isEditMode) return;
     let code = sharedListId;
     if (!isShared) {
         const userListRef = doc(db, `users/${auth.currentUser.uid}/lists`, listId);
@@ -232,6 +294,7 @@ export default function ListEditScreen({ route, navigation }) {
         setSnackbarMessage(`'${article.name}${article.size ? ` (${article.size})` : ''}' hinzugefügt`);
         setSnackbarVisible(true);
     }
+     setTimeout(() => { isProcessingScan.current = false; }, 1000);
   };
   
   const openBarcodeScanner = () => {
@@ -254,9 +317,11 @@ export default function ListEditScreen({ route, navigation }) {
   };
 
   const renderArticle = ({ item }) => {
-    const isEditing = editingArticleId === item.id;
+    const isEditingThisItem = editingArticleId === item.id;
+    const isSelected = selectedArticles.includes(item.id);
 
     const renderRightActions = (progress, dragX) => {
+      if (isEditMode) return null;
       const trans = dragX.interpolate({
         inputRange: [-100, 0],
         outputRange: [0, 100],
@@ -273,26 +338,45 @@ export default function ListEditScreen({ route, navigation }) {
     };
     
     return (
-      <Swipeable renderRightActions={renderRightActions}>
-          <View style={styles.articleWrapper}>
-            <View style={styles.articleContainer}>
-              <Checkbox.Android
-                status={item.completed ? 'checked' : 'unchecked'}
-                onPress={() => handleToggleArticle(item)}
-                disabled={isEditing}
-              />
-              <Text style={styles.quantityText}>{item.quantity}x</Text>
-              <Text style={[styles.articleText, item.completed && styles.articleTextCompleted]}>
-                 {item.name}{item.size ? ` (${item.size})` : ''}
-              </Text>
-              <IconButton
-                icon={isEditing ? "chevron-up" : "pencil"}
-                size={20}
-                onPress={() => handleToggleEdit(item)}
-                style={styles.editButton}
-              />
-            </View>
-            {isEditing && (
+      <Swipeable renderRightActions={renderRightActions} enabled={!isEditMode}>
+          <View style={[styles.articleWrapper, isSelected && styles.selectedArticle]}>
+            <TouchableOpacity 
+              onPress={() => isEditMode ? handleToggleSelect(item.id) : handleToggleArticle(item)}
+              onLongPress={() => {
+                if (!isEditMode) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setIsEditMode(true);
+                  setSelectedArticles([item.id]);
+                }
+              }}
+              delayLongPress={200}
+              activeOpacity={0.8}
+            >
+              <View style={styles.articleContainer}>
+                {isEditMode ? (
+                  <Checkbox.Android status={isSelected ? 'checked' : 'unchecked'} onPress={() => handleToggleSelect(item.id)}/>
+                ) : (
+                  <Checkbox.Android
+                    status={item.completed ? 'checked' : 'unchecked'}
+                    onPress={() => handleToggleArticle(item)}
+                    disabled={isEditingThisItem}
+                  />
+                )}
+                <Text style={styles.quantityText}>{item.quantity}x</Text>
+                <Text style={[styles.articleText, item.completed && !isEditMode && styles.articleTextCompleted]}>
+                   {item.name}{item.size ? ` (${item.size})` : ''}
+                </Text>
+                {!isEditMode && 
+                  <IconButton
+                    icon={isEditingThisItem ? "chevron-up" : "pencil"}
+                    size={20}
+                    onPress={() => handleToggleEdit(item)}
+                    style={styles.editButton}
+                  />
+                }
+              </View>
+            </TouchableOpacity>
+            {!isEditMode && isEditingThisItem && (
               <View style={styles.editContainer}>
                 <TextInput label="Name" value={editName} onChangeText={setEditName} style={styles.editInput}/>
                 <TextInput label="Anzahl" value={editQuantity} onChangeText={setEditQuantity} keyboardType="numeric" style={[styles.editInput, {marginTop: 8}]}/>
@@ -314,15 +398,18 @@ export default function ListEditScreen({ route, navigation }) {
           data={articles}
           keyExtractor={(item) => item.id}
           renderItem={renderArticle}
-          contentContainerStyle={{ paddingBottom: 80 }}
+          contentContainerStyle={{ paddingBottom: isEditMode ? 60 : 80 }}
+          extraData={isEditMode + selectedArticles.length}
         />
         
-        <Animated.View style={[styles.inputContainer, { bottom: keyboardOffset }]}>
-          <SafeAreaView style={{flexDirection: 'row'}} edges={['left', 'right']}>
-              <TextInput label="Menge" value={newArticleQuantity} onChangeText={setNewArticleQuantity} style={styles.quantityInput} keyboardType="numeric" />
-              <TextInput ref={nameInputRef} label="Neuer Artikel" value={newArticleName} onChangeText={setNewArticleName} style={styles.nameInput} onSubmitEditing={handleAddArticle} right={<TextInput.Icon icon="barcode-scan" onPress={openBarcodeScanner} />} />
-          </SafeAreaView>
-        </Animated.View>
+        {!isEditMode && (
+          <Animated.View style={[styles.inputContainer, { bottom: keyboardOffset }]}>
+            <SafeAreaView style={{flexDirection: 'row'}} edges={['left', 'right']}>
+                <TextInput label="Menge" value={newArticleQuantity} onChangeText={setNewArticleQuantity} style={styles.quantityInput} keyboardType="numeric" />
+                <TextInput ref={nameInputRef} label="Neuer Artikel" value={newArticleName} onChangeText={setNewArticleName} style={styles.nameInput} onSubmitEditing={handleAddArticle} right={<TextInput.Icon icon="barcode-scan" onPress={openBarcodeScanner} />} />
+            </SafeAreaView>
+          </Animated.View>
+        )}
 
         <Modal visible={isBarcodeModalVisible} onRequestClose={() => setIsBarcodeModalVisible(false)} animationType="slide" presentationStyle="fullScreen">
           <View style={styles.modalContainer}>
@@ -354,11 +441,17 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'white' },
   headerInput: { fontSize: 18, fontWeight: 'bold', backgroundColor: 'transparent', width: 250 },
   articleWrapper: { borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: 'white' },
-  articleContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8 },
+  selectedArticle: { backgroundColor: '#e0e0e0' },
+  articleContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingVertical: 8, 
+    paddingHorizontal: 16 
+  },
   quantityText: { fontSize: 16, marginHorizontal: 8, fontWeight: 'bold' },
   articleText: { flex: 1, fontSize: 16 },
   articleTextCompleted: { textDecorationLine: 'line-through', color: 'grey' },
-  editButton: { marginLeft: 'auto' },
+  editButton: { marginLeft: 'auto', marginRight: -8 },
   editContainer: { padding: 16, backgroundColor: '#fafafa' },
   editInput: { backgroundColor: '#f0f0f0' },
   editActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 },
