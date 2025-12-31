@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { View, FlatList, StyleSheet, Text } from 'react-native';
-import { FAB, Searchbar, Portal, Dialog, TextInput, Button } from 'react-native-paper';
-import ListCard from '../components/ListCard';
+import { FAB, Searchbar, Portal, Dialog, TextInput, Button, Card, Title, Paragraph, IconButton, Subheading } from 'react-native-paper';
 import { useIsFocused } from '@react-navigation/native';
 import { auth, db } from '../services/firebase';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, arrayUnion } from 'firebase/firestore';
@@ -160,7 +159,6 @@ export default function StartScreen({ route, navigation }) {
       return;
     }
     
-    // Renaming shared lists is handled in ListEditScreen. This dialog is only for private lists.
     if (listToRename.isShared) {
         alert("Geteilte Listen können nur innerhalb der Liste selbst umbenannt werden.");
         setIsRenameDialogVisible(false);
@@ -182,6 +180,49 @@ export default function StartScreen({ route, navigation }) {
     navigation.navigate('ListEdit', { listId: list.id, listName: list.name, isShared: list.isShared, sharedListId: list.sharedListId });
   };
 
+  const renderListCard = ({ item }) => {
+    const formatDate = (timestamp) => {
+      if (!timestamp) return 'Kein Datum';
+      return new Date(timestamp).toLocaleDateString();
+    };
+  
+    return (
+      <Card style={styles.card} onPress={isEditMode ? undefined : () => navigateToList(item)}>
+        <Card.Content style={styles.contentContainer}>
+          <View style={styles.textContainer}>
+            <Title style={styles.title}>{item.name}</Title>
+            <Paragraph style={styles.paragraph}>Erstellt am: {formatDate(item.createdAt)}</Paragraph>
+          </View>
+          
+          {isEditMode && (
+            <View style={styles.actionsContainer}>
+              <IconButton
+                icon="pencil"
+                size={24}
+                onPress={() => openRenameDialog(item)}
+              />
+              <IconButton
+                icon="delete"
+                color="red"
+                size={24}
+                onPress={() => handleDeleteList(item.id)}
+              />
+            </View>
+          )}
+        </Card.Content>
+      </Card>
+    );
+  };
+
+  const EmptyListComponent = () => (
+    <View style={styles.emptyContainer}>
+        <Title style={styles.emptyTitle}>Willkommen!</Title>
+        <Subheading style={styles.emptySubheading}>
+            Du hast noch keine Einkaufslisten. Tippe auf das <Text style={{fontWeight: 'bold'}}>+</Text> unten rechts, um deine erste Liste zu erstellen.
+        </Subheading>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       {isSearchVisible && (
@@ -196,16 +237,9 @@ export default function StartScreen({ route, navigation }) {
       <FlatList
         data={filteredLists}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ListCard
-            list={item}
-            onPress={() => navigateToList(item)}
-            onDelete={() => handleDeleteList(item.id)}
-            onRename={() => openRenameDialog(item)}
-            isEditMode={isEditMode}
-          />
-        )}
-        ListEmptyComponent={<View><Text style={{textAlign: 'center', marginTop: 20}}>Keine Listen vorhanden.</Text></View>}
+        renderItem={renderListCard}
+        ListEmptyComponent={EmptyListComponent}
+        contentContainerStyle={lists.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : {}}
       />
       <FAB style={styles.fab} icon="plus" onPress={handleAddList} />
 
@@ -252,4 +286,42 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   fab: { position: 'absolute', margin: 16, right: 0, bottom: 0 },
   searchbar: { margin: 8 },
+  card: {
+    marginVertical: 4,
+    marginHorizontal: 8,
+  },
+  contentContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  textContainer: {
+    flex: 1, 
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+  },
+  title: {
+    fontSize: 18,
+  },
+  paragraph: {
+    fontSize: 12,
+    color: 'grey',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  emptySubheading: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
 });
