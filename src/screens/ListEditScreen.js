@@ -36,6 +36,7 @@ export default function ListEditScreen({ route, navigation }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedArticles, setSelectedArticles] = useState([]);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [menuKey, setMenuKey] = useState(0); // The fix: Add a key state
 
   const nameInputRef = useRef(null);
   const isProcessingScan = useRef(false);
@@ -117,9 +118,13 @@ export default function ListEditScreen({ route, navigation }) {
           <View style={{ flexDirection: 'row' }}>
             <IconButton icon="account-plus" onPress={handleShareList} />
             <Menu
+              key={menuKey} // The fix: Apply the key
               visible={isMenuVisible}
               onDismiss={() => setIsMenuVisible(false)}
-              anchor={<IconButton icon="dots-vertical" onPress={() => setIsMenuVisible(true)} />}
+              anchor={<IconButton icon="dots-vertical" onPress={() => {
+                setMenuKey(k => k + 1); // The fix: Increment key on open
+                setIsMenuVisible(true);
+              }} />}
             >
               <Menu.Item onPress={() => { setIsEditMode(true); setIsMenuVisible(false); }} title="Artikel auswählen" />
               <Menu.Item onPress={handleDeleteCompleted} title="Erledigte löschen" />
@@ -128,7 +133,7 @@ export default function ListEditScreen({ route, navigation }) {
         );
       },
     });
-  }, [navigation, editableListName, updateListName, isEditMode, selectedArticles, isMenuVisible]);
+  }, [navigation, editableListName, updateListName, isEditMode, selectedArticles, isMenuVisible, menuKey]);
 
   const getListRef = useCallback(() => {
     return isShared && sharedListId

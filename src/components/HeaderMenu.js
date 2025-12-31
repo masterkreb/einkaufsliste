@@ -1,36 +1,47 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View } from 'react-native';
 import { Menu, IconButton, Divider } from 'react-native-paper';
 import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
-// This component is the 3-dot menu in the header
 const HeaderMenu = ({ navigation }) => {
   const [visible, setVisible] = useState(false);
-  const openMenu = () => setVisible(true);
-  const closeMenu = () => setVisible(false);
+  // We add a key that we can change to force React to re-render the component from scratch.
+  const [menuKey, setMenuKey] = useState(0);
 
-  // Handles actions that navigate or change state in StartScreen
+  const openMenu = () => {
+    // Every time we open the menu, we change its key.
+    // This forces React to destroy the old instance and create a new one,
+    // bypassing the internal state bug of the Menu component on iOS.
+    setMenuKey(prevKey => prevKey + 1);
+    setVisible(true);
+  };
+
+  const closeMenu = () => {
+    setVisible(false);
+  };
+
   const handleAction = (action) => {
     closeMenu();
-    // We pass an action to the StartScreen via route params to trigger state changes
     navigation.navigate('Start', { action: action, timestamp: Date.now() });
   };
   
-  // Handles the logout action
-  const handleLogout = async () => {
+  const handleLogout = () => {
     closeMenu();
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Error signing out: ", error);
-    }
+    setTimeout(async () => {
+        try {
+          await signOut(auth);
+        } catch (error) {
+          console.error("Error signing out: ", error);
+        }
+    }, 50);
   };
 
   return (
     <View style={{ flexDirection: 'row' }}>
       <Menu
+        key={menuKey} // The key prop is the magic here!
         visible={visible}
         onDismiss={closeMenu}
         anchor={<IconButton icon="dots-vertical" onPress={openMenu} />}
