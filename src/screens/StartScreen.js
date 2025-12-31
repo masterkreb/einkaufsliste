@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { View, FlatList, StyleSheet, Text } from 'react-native';
 import { FAB, Searchbar, Portal, Dialog, TextInput, Button } from 'react-native-paper';
 import ListCard from '../components/ListCard';
 import { useIsFocused } from '@react-navigation/native';
 import { auth, db } from '../services/firebase';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, where, getDocs, collectionGroup, arrayUnion, getDoc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, arrayUnion } from 'firebase/firestore';
 
 export default function StartScreen({ route, navigation }) {
   const [lists, setLists] = useState([]);
@@ -22,30 +23,68 @@ export default function StartScreen({ route, navigation }) {
 
   const isFocused = useIsFocused();
   const user = auth.currentUser;
-  const { action, timestamp } = route.params || {};
+
+  const sharedListUnsubscribersRef = useRef({});
 
   useEffect(() => {
+    const { action, timestamp } = route.params || {};
     if (timestamp && action) {
       switch (action) {
         case 'edit': setIsEditMode(prev => !prev); setIsSearchVisible(false); break;
         case 'search': setIsSearchVisible(prev => !prev); setIsEditMode(false); break;
         case 'join': setIsJoinDialogVisible(true); break;
       }
+      navigation.setParams({ action: null, timestamp: null });
     }
-  }, [action, timestamp]);
+  }, [route.params?.action, route.params?.timestamp, navigation]);
 
   useEffect(() => {
-    if (isFocused && user) {
-      const userListsRef = collection(db, `users/${user.uid}/lists`);
-      const unsubscribeUserLists = onSnapshot(userListsRef, (snapshot) => {
-        const userLists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setLists(prevLists => [...userLists.filter(ul => !prevLists.some(pl => pl.id === ul.id)), ...prevLists.filter(pl => userLists.some(ul => ul.id === pl.id))]);
-        setFilteredLists(prevLists => [...userLists.filter(ul => !prevLists.some(pl => pl.id === ul.id)), ...prevLists.filter(pl => userLists.some(ul => ul.id === pl.id))]);
-      });
-
-      return () => unsubscribeUserLists();
+    if (!isFocused || !user) {
+        setLists([]);
+        setFilteredLists([]);
+        Object.values(sharedListUnsubscribersRef.current).forEach(unsub => unsub());
+        sharedListUnsubscribersRef.current = {};
+        return;
     }
-  }, [isFocused, user]);
+
+    const userListsRef = collection(db, `users/${user.uid}/lists`);
+    const mainUnsubscribe = onSnapshot(userListsRef, (snapshot) => {
+        const freshUserLists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const currentUnsubscribers = { ...sharedListUnsubscribersRef.current };
+        const newSubscribers = {};
+
+        freshUserLists.forEach(list => {
+            if (list.isShared && list.sharedListId) {
+                const listId = list.sharedListId;
+                if (currentUnsubscribers[listId]) {
+                    newSubscribers[listId] = currentUnsubscribers[listId];
+                    delete currentUnsubscribers[listId];
+                } else {
+                    const sharedListRef = doc(db, 'sharedLists', listId);
+                    newSubscribers[listId] = onSnapshot(sharedListRef, (sharedDoc) => {
+                        if (sharedDoc.exists()) {
+                            const sharedData = sharedDoc.data();
+                            setLists(prevLists =>
+                                prevLists.map(l => (l.id === listId || l.sharedListId === listId) ? { ...l, name: sharedData.name } : l)
+                            );
+                        }
+                    });
+                }
+            }
+        });
+
+        Object.values(currentUnsubscribers).forEach(unsub => unsub());
+        sharedListUnsubscribersRef.current = newSubscribers;
+        setLists(freshUserLists);
+    });
+
+    return () => {
+        mainUnsubscribe();
+        Object.values(sharedListUnsubscribersRef.current).forEach(unsub => unsub());
+        sharedListUnsubscribersRef.current = {};
+    };
+}, [isFocused, user]);
+
 
   useEffect(() => {
     if (searchQuery) {
@@ -54,56 +93,59 @@ export default function StartScreen({ route, navigation }) {
     } else {
       setFilteredLists(lists);
     }
-  }, [searchQuery, lists]);
+  }, [lists, searchQuery]);
 
   const handleAddList = async () => {
+    if (!user) return;
     await addDoc(collection(db, `users/${user.uid}/lists`), { 
       name: 'Neue Liste', 
       articles: [], 
       createdAt: Date.now(), 
       updatedAt: Date.now(),
-      isShared: false, // Explicitly set isShared to false
+      isShared: false,
     });
   };
 
   const handleDeleteList = async (listId) => {
+    if (!user) return;
     await deleteDoc(doc(db, `users/${user.uid}/lists`, listId));
   };
 
   const handleJoinList = async () => {
     const code = joinCode.trim().toUpperCase();
-    if (!code) return;
+    if (!code || !user) return;
 
     const sharedListRef = doc(db, 'sharedLists', code);
 
     try {
-      // Attempt to update the members list.
-      // This will succeed only if the security rules allow it.
       await updateDoc(sharedListRef, {
         members: arrayUnion(user.uid)
       });
 
-      // If the update was successful, create a local reference for the user.
       const sharedListSnap = await getDoc(sharedListRef);
       if (sharedListSnap.exists()) {
         const sharedList = sharedListSnap.data();
         await setDoc(doc(db, `users/${user.uid}/lists`, code), {
           name: sharedList.name,
           isShared: true,
-          sharedListId: code, // The ID of the shared list is the code
+          sharedListId: code,
           joinedAt: Date.now()
         });
         alert('Liste erfolgreich beigetreten!');
       } else {
-          // This case should not happen if the updateDoc succeeds
-          throw new Error("List does not exist.");
+          throw new Error("Konnte die Liste nach dem Beitreten nicht finden.");
       }
     } catch (error) {
       console.error('Error joining list:', error);
-      alert('Fehler beim Beitreten. Prüfe den Code oder deine Berechtigungen.');
+      if (error.code === 'permission-denied' || error.code === 'not-found') {
+           alert('Fehler beim Beitreten. Prüfe den Freigabecode. Er ist entweder falsch oder die Liste existiert nicht mehr.');
+      } else {
+           alert('Ein unerwarteter Fehler ist aufgetreten.');
+      }
+    } finally {
+        setIsJoinDialogVisible(false);
+        setJoinCode('');
     }
-    setIsJoinDialogVisible(false);
-    setJoinCode('');
   };
 
   const openRenameDialog = (list) => {
@@ -113,17 +155,31 @@ export default function StartScreen({ route, navigation }) {
   };
 
   const handleRenameList = async () => {
-    if (listToRename && newListName.trim() !== '' && newListName !== listToRename.name) {
-      const listRef = doc(db, `users/${user.uid}/lists`, listToRename.id);
-      await updateDoc(listRef, { name: newListName, updatedAt: Date.now() });
+    if (!listToRename || !newListName.trim() || newListName.trim() === listToRename.name) {
+      setIsRenameDialogVisible(false);
+      return;
     }
-    setIsRenameDialogVisible(false);
-    setListToRename(null);
-    setNewListName('');
+    
+    // Renaming shared lists is handled in ListEditScreen. This dialog is only for private lists.
+    if (listToRename.isShared) {
+        alert("Geteilte Listen können nur innerhalb der Liste selbst umbenannt werden.");
+        setIsRenameDialogVisible(false);
+        return;
+    }
+
+    try {
+        const userListRef = doc(db, `users/${user.uid}/lists`, listToRename.id);
+        await updateDoc(userListRef, { name: newListName.trim(), updatedAt: Date.now() });
+    } catch (error) {
+        console.error("Error renaming private list:", error);
+        alert("Fehler beim Umbenennen der Liste.");
+    } finally {
+        setIsRenameDialogVisible(false);
+    }
   };
 
   const navigateToList = (list) => {
-    navigation.navigate('ListEdit', { listId: list.id, listName: list.name });
+    navigation.navigate('ListEdit', { listId: list.id, listName: list.name, isShared: list.isShared, sharedListId: list.sharedListId });
   };
 
   return (
@@ -149,29 +205,11 @@ export default function StartScreen({ route, navigation }) {
             isEditMode={isEditMode}
           />
         )}
-        ListEmptyComponent={<View><Text style={{textAlign: 'center', marginTop: 20}}>Keine Listen vorhanden. Erstelle eine neue mit dem "+" Button!</Text></View>}
+        ListEmptyComponent={<View><Text style={{textAlign: 'center', marginTop: 20}}>Keine Listen vorhanden.</Text></View>}
       />
       <FAB style={styles.fab} icon="plus" onPress={handleAddList} />
 
       <Portal>
-        <Dialog visible={isJoinDialogVisible} onDismiss={() => setIsJoinDialogVisible(false)}>
-          <Dialog.Title>Liste beitreten</Dialog.Title>
-          <Dialog.Content>
-            <TextInput
-              label="Freigabecode eingeben"
-              value={joinCode}
-              onChangeText={setJoinCode}
-              autoCapitalize="characters"
-              autoFocus
-              placeholder="z.B. ABC123"
-            />
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setIsJoinDialogVisible(false)}>Abbrechen</Button>
-            <Button onPress={handleJoinList}>Beitreten</Button>
-          </Dialog.Actions>
-        </Dialog>
-
         <Dialog visible={isRenameDialogVisible} onDismiss={() => setIsRenameDialogVisible(false)}>
           <Dialog.Title>Liste umbenennen</Dialog.Title>
           <Dialog.Content>
@@ -187,6 +225,24 @@ export default function StartScreen({ route, navigation }) {
             <Button onPress={handleRenameList}>Speichern</Button>
           </Dialog.Actions>
         </Dialog>
+
+        <Dialog visible={isJoinDialogVisible} onDismiss={() => setIsJoinDialogVisible(false)}>
+            <Dialog.Title>Liste beitreten</Dialog.Title>
+            <Dialog.Content>
+                <TextInput
+                label="Freigabecode eingeben"
+                value={joinCode}
+                onChangeText={setJoinCode}
+                autoCapitalize="characters"
+                autoFocus
+                placeholder="z.B. ABC123"
+                />
+            </Dialog.Content>
+            <Dialog.Actions>
+                <Button onPress={() => setIsJoinDialogVisible(false)}>Abbrechen</Button>
+                <Button onPress={handleJoinList}>Beitreten</Button>
+            </Dialog.Actions>
+        </Dialog>
       </Portal>
     </View>
   );
@@ -195,5 +251,5 @@ export default function StartScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   fab: { position: 'absolute', margin: 16, right: 0, bottom: 0 },
-  searchbar: { margin: 8 }
+  searchbar: { margin: 8 },
 });
