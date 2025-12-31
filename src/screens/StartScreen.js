@@ -64,7 +64,7 @@ export default function StartScreen({ route, navigation }) {
                         if (sharedDoc.exists()) {
                             const sharedData = sharedDoc.data();
                             setLists(prevLists =>
-                                prevLists.map(l => (l.id === listId || l.sharedListId === listId) ? { ...l, name: sharedData.name } : l)
+                                prevLists.map(l => (l.id === listId || l.sharedListId === listId) ? { ...l, name: sharedData.name, articles: sharedData.articles } : l)
                             );
                         }
                     });
@@ -182,16 +182,32 @@ export default function StartScreen({ route, navigation }) {
 
   const renderListCard = ({ item }) => {
     const formatDate = (timestamp) => {
-      if (!timestamp) return 'Kein Datum';
+      if (!timestamp) return 'Unbekannt';
       return new Date(timestamp).toLocaleDateString();
     };
   
+    const displayDate = item.updatedAt ? `Zuletzt bearbeitet: ${formatDate(item.updatedAt)}` : `Erstellt am: ${formatDate(item.createdAt)}`;
+
+    const articlesPreview = item.articles && item.articles.length > 0
+      ? item.articles.slice(0, 3).map(a => a.name).join(', ') + (item.articles.length > 3 ? '...' : '')
+      : 'Noch keine Artikel';
+
     return (
       <Card style={styles.card} onPress={isEditMode ? undefined : () => navigateToList(item)}>
         <Card.Content style={styles.contentContainer}>
+          {item.isShared && (
+            <IconButton
+              icon="account-group"
+              size={20}
+              style={styles.sharedIcon}
+              color="#666"
+            />
+          )}
+
           <View style={styles.textContainer}>
             <Title style={styles.title}>{item.name}</Title>
-            <Paragraph style={styles.paragraph}>Erstellt am: {formatDate(item.createdAt)}</Paragraph>
+            <Paragraph style={styles.paragraph}>{displayDate}</Paragraph>
+            <Paragraph style={[styles.paragraph, styles.articlesPreview]}>{articlesPreview}</Paragraph>
           </View>
           
           {isEditMode && (
@@ -287,26 +303,40 @@ const styles = StyleSheet.create({
   fab: { position: 'absolute', margin: 16, right: 0, bottom: 0 },
   searchbar: { margin: 8 },
   card: {
-    marginVertical: 4,
-    marginHorizontal: 8,
+    marginVertical: 5,
+    marginHorizontal: 10,
   },
   contentContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    padding: 12,
   },
   textContainer: {
     flex: 1, 
+    paddingRight: 10, // Make some space for edit buttons
   },
   actionsContainer: {
     flexDirection: 'row',
   },
   title: {
     fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
   },
   paragraph: {
     fontSize: 12,
     color: 'grey',
+  },
+  articlesPreview: {
+    marginTop: 5,
+    fontStyle: 'italic',
+  },
+  sharedIcon: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    margin: 0,
   },
   emptyContainer: {
     flex: 1,
