@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, SafeAreaView, LayoutAnimation, UIManager, Animated } from 'react-native';
-import { IconButton, TextInput, Checkbox, Text, Button, Portal, Dialog, Snackbar } from 'react-native-paper';
+import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, SafeAreaView, LayoutAnimation, UIManager, Animated, TouchableOpacity } from 'react-native';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { IconButton, TextInput, Checkbox, Text, Button, Portal, Dialog, Snackbar, Icon } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
-import { doc, getDoc, updateDoc, onSnapshot, arrayUnion, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, setDoc } from 'firebase/firestore';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import BarcodeScannerComponent from '../components/BarcodeScanner';
@@ -149,6 +150,14 @@ export default function ListEditScreen({ route, navigation }) {
       }
     }
   };
+  
+  const handleDeleteArticle = async (articleToDelete) => {
+    const listRef = getListRef();
+    await updateDoc(listRef, { articles: arrayRemove(articleToDelete) });
+    setSnackbarMessage(`'${articleToDelete.name}' gelöscht`);
+    setSnackbarVisible(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
 
   const handleToggleEdit = (article) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -246,85 +255,105 @@ export default function ListEditScreen({ route, navigation }) {
 
   const renderArticle = ({ item }) => {
     const isEditing = editingArticleId === item.id;
+
+    const renderRightActions = (progress, dragX) => {
+      const trans = dragX.interpolate({
+        inputRange: [-100, 0],
+        outputRange: [0, 100],
+        extrapolate: 'clamp',
+      });
+      return (
+        <TouchableOpacity onPress={() => handleDeleteArticle(item)} style={styles.deleteAction}>
+          <Animated.View style={[styles.deleteButtonContainer, { transform: [{ translateX: trans }] }]}>
+            <Icon source="delete" color="white" size={24} />
+            <Text style={styles.deleteButtonText}>Löschen</Text>
+          </Animated.View>
+        </TouchableOpacity>
+      );
+    };
     
     return (
-      <View style={styles.articleWrapper}>
-        <View style={styles.articleContainer}>
-          <Checkbox.Android
-            status={item.completed ? 'checked' : 'unchecked'}
-            onPress={() => handleToggleArticle(item)}
-            disabled={isEditing}
-          />
-          <Text style={styles.quantityText}>{item.quantity}x</Text>
-          <Text style={[styles.articleText, item.completed && styles.articleTextCompleted]}>
-             {item.name}{item.size ? ` (${item.size})` : ''}
-          </Text>
-          <IconButton
-            icon={isEditing ? "chevron-up" : "pencil"}
-            size={20}
-            onPress={() => handleToggleEdit(item)}
-            style={styles.editButton}
-          />
-        </View>
-        {isEditing && (
-          <View style={styles.editContainer}>
-            <TextInput label="Name" value={editName} onChangeText={setEditName} style={styles.editInput}/>
-            <TextInput label="Anzahl" value={editQuantity} onChangeText={setEditQuantity} keyboardType="numeric" style={[styles.editInput, {marginTop: 8}]}/>
-            <View style={styles.editActions}>
-              <Button onPress={() => setEditingArticleId(null)}>Abbrechen</Button>
-              <Button onPress={handleSaveEdit}>Speichern</Button>
+      <Swipeable renderRightActions={renderRightActions}>
+          <View style={styles.articleWrapper}>
+            <View style={styles.articleContainer}>
+              <Checkbox.Android
+                status={item.completed ? 'checked' : 'unchecked'}
+                onPress={() => handleToggleArticle(item)}
+                disabled={isEditing}
+              />
+              <Text style={styles.quantityText}>{item.quantity}x</Text>
+              <Text style={[styles.articleText, item.completed && styles.articleTextCompleted]}>
+                 {item.name}{item.size ? ` (${item.size})` : ''}
+              </Text>
+              <IconButton
+                icon={isEditing ? "chevron-up" : "pencil"}
+                size={20}
+                onPress={() => handleToggleEdit(item)}
+                style={styles.editButton}
+              />
             </View>
+            {isEditing && (
+              <View style={styles.editContainer}>
+                <TextInput label="Name" value={editName} onChangeText={setEditName} style={styles.editInput}/>
+                <TextInput label="Anzahl" value={editQuantity} onChangeText={setEditQuantity} keyboardType="numeric" style={[styles.editInput, {marginTop: 8}]}/>
+                <View style={styles.editActions}>
+                  <Button onPress={() => setEditingArticleId(null)}>Abbrechen</Button>
+                  <Button onPress={handleSaveEdit}>Speichern</Button>
+                </View>
+              </View>
+            )}
           </View>
-        )}
-      </View>
+      </Swipeable>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <FlatList
-        data={articles}
-        keyExtractor={(item) => item.id}
-        renderItem={renderArticle}
-        contentContainerStyle={{ paddingBottom: 80 }}
-      />
-      
-      <Animated.View style={[styles.inputContainer, { bottom: keyboardOffset }]}>
-        <SafeAreaView style={{flexDirection: 'row'}} edges={['left', 'right']}>
-            <TextInput label="Menge" value={newArticleQuantity} onChangeText={setNewArticleQuantity} style={styles.quantityInput} keyboardType="numeric" />
-            <TextInput ref={nameInputRef} label="Neuer Artikel" value={newArticleName} onChangeText={setNewArticleName} style={styles.nameInput} onSubmitEditing={handleAddArticle} right={<TextInput.Icon icon="barcode-scan" onPress={openBarcodeScanner} />} />
-        </SafeAreaView>
-      </Animated.View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container}>
+        <FlatList
+          data={articles}
+          keyExtractor={(item) => item.id}
+          renderItem={renderArticle}
+          contentContainerStyle={{ paddingBottom: 80 }}
+        />
+        
+        <Animated.View style={[styles.inputContainer, { bottom: keyboardOffset }]}>
+          <SafeAreaView style={{flexDirection: 'row'}} edges={['left', 'right']}>
+              <TextInput label="Menge" value={newArticleQuantity} onChangeText={setNewArticleQuantity} style={styles.quantityInput} keyboardType="numeric" />
+              <TextInput ref={nameInputRef} label="Neuer Artikel" value={newArticleName} onChangeText={setNewArticleName} style={styles.nameInput} onSubmitEditing={handleAddArticle} right={<TextInput.Icon icon="barcode-scan" onPress={openBarcodeScanner} />} />
+          </SafeAreaView>
+        </Animated.View>
 
-      <Modal visible={isBarcodeModalVisible} onRequestClose={() => setIsBarcodeModalVisible(false)} animationType="slide" presentationStyle="fullScreen">
-        <View style={styles.modalContainer}>
-          <BarcodeScannerComponent onScan={handleScan} onClose={() => setIsBarcodeModalVisible(false)} />
-        </View>
-      </Modal>
+        <Modal visible={isBarcodeModalVisible} onRequestClose={() => setIsBarcodeModalVisible(false)} animationType="slide" presentationStyle="fullScreen">
+          <View style={styles.modalContainer}>
+            <BarcodeScannerComponent onScan={handleScan} onClose={() => setIsBarcodeModalVisible(false)} />
+          </View>
+        </Modal>
 
-      <Portal>
-        <Dialog visible={isShareDialogVisible} onDismiss={() => setIsShareDialogVisible(false)}>
-          <Dialog.Title>Liste freigeben</Dialog.Title>
-          <Dialog.Content>
-            <Text>Teile diesen Code, damit Freunde beitreten können:</Text>
-            <Text style={styles.shareCodeText}>{shareCode}</Text>
-            <Button mode="contained" onPress={handleCopyCode} style={{ marginTop: 10 }}>Code kopieren</Button>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setIsShareDialogVisible(false)}>Schließen</Button>
-            <Button onPress={handleShareCode}>Teilen</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-      <Snackbar visible={snackbarVisible} onDismiss={() => setSnackbarVisible(false)} duration={3000}>{snackbarMessage}</Snackbar>
-    </SafeAreaView>
+        <Portal>
+          <Dialog visible={isShareDialogVisible} onDismiss={() => setIsShareDialogVisible(false)}>
+            <Dialog.Title>Liste freigeben</Dialog.Title>
+            <Dialog.Content>
+              <Text>Teile diesen Code, damit Freunde beitreten können:</Text>
+              <Text style={styles.shareCodeText}>{shareCode}</Text>
+              <Button mode="contained" onPress={handleCopyCode} style={{ marginTop: 10 }}>Code kopieren</Button>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onPress={() => setIsShareDialogVisible(false)}>Schließen</Button>
+              <Button onPress={handleShareCode}>Teilen</Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+        <Snackbar visible={snackbarVisible} onDismiss={() => setSnackbarVisible(false)} duration={3000}>{snackbarMessage}</Snackbar>
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'white' },
   headerInput: { fontSize: 18, fontWeight: 'bold', backgroundColor: 'transparent', width: 250 },
-  articleWrapper: { borderBottomWidth: 1, borderBottomColor: '#eee' },
+  articleWrapper: { borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: 'white' },
   articleContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8 },
   quantityText: { fontSize: 16, marginHorizontal: 8, fontWeight: 'bold' },
   articleText: { flex: 1, fontSize: 16 },
@@ -337,5 +366,23 @@ const styles = StyleSheet.create({
   quantityInput: { width: 80, marginRight: 8 },
   nameInput: { flex: 1 },
   modalContainer: { flex: 1 },
-  shareCodeText: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginVertical: 10 }
+  shareCodeText: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginVertical: 10 },
+  deleteAction: {
+    backgroundColor: '#ff4444',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    width: 100,
+  },
+  deleteButtonContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 100,
+  },
+  deleteButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
 });
