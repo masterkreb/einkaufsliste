@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useLayoutEffect } from 'react';
-import { View, FlatList, StyleSheet, Text, BackHandler } from 'react-native';
+import { View, FlatList, StyleSheet, Text, BackHandler, Keyboard } from 'react-native';
 import { FAB, Portal, Dialog, TextInput, Button, Card, Title, Paragraph, IconButton, Subheading, Searchbar } from 'react-native-paper';
 import { useIsFocused } from '@react-navigation/native';
 import { auth, db } from '../services/firebase';
@@ -14,6 +14,7 @@ export default function StartScreen({ route, navigation }) {
   
   const [isEditMode, setIsEditMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   
   const [isJoinDialogVisible, setIsJoinDialogVisible] = useState(false);
   const [joinCode, setJoinCode] = useState('');
@@ -58,9 +59,9 @@ export default function StartScreen({ route, navigation }) {
   const toggleEditMode = () => {
     const newEditMode = !isEditMode;
     setIsEditMode(newEditMode);
-    // When entering edit mode, clear the search query for a cleaner UI
     if (newEditMode) {
       setSearchQuery('');
+      Keyboard.dismiss();
     }
   };
 
@@ -132,6 +133,15 @@ export default function StartScreen({ route, navigation }) {
       setFilteredLists(lists);
     }
   }, [lists, searchQuery]);
+
+  const handleClearSearchText = () => {
+    setSearchQuery('');
+  };
+
+  const handleCancelSearch = () => {
+    setSearchQuery('');
+    Keyboard.dismiss();
+  };
 
   const handleAddList = async () => {
     if (!user) return;
@@ -287,13 +297,20 @@ export default function StartScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <Searchbar
-        placeholder="Listen durchsuchen..."
-        onChangeText={setSearchQuery}
-        value={searchQuery}
-        style={styles.searchBar}
-        onIconPress={() => {if (isEditMode) toggleEditMode()}} // Exit edit mode when search is used
-      />
+        <View style={styles.searchSection}>
+            <Searchbar
+                placeholder="Listen durchsuchen..."
+                onChangeText={setSearchQuery}
+                value={searchQuery}
+                style={styles.searchBar}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
+                onClearIconPress={handleClearSearchText}
+            />
+            {isSearchFocused && (
+                <Button onPress={handleCancelSearch} style={styles.cancelButton}>Abbrechen</Button>
+            )}
+        </View>
       <FlatList
         data={filteredLists}
         keyExtractor={(item) => item.id}
@@ -345,10 +362,18 @@ export default function StartScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   fab: { position: 'absolute', margin: 16, right: 0, bottom: 0 },
-  searchBar: {
-    marginHorizontal: 10,
+  searchSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 10,
-    marginBottom: 5,
+    paddingHorizontal: 10,
+  },
+  searchBar: {
+    flex: 1,
+    marginRight: 5,
+  },
+  cancelButton: {
+    marginLeft: 5,
   },
   card: {
     marginVertical: 5,
