@@ -153,9 +153,10 @@ export default function ListEditScreen({ route, navigation }) {
   // --- Logic Functions ---
   const addArticleToList = async (article) => {
     if (!article || !article.name || article.name.trim() === '') return;
+    const safeQuantity = String(article.quantity ?? '').trim();
     const newArticle = {
         id: `item-${Date.now()}`, name: article.name.trim(),
-        quantity: article.quantity.trim() || '1', size: article.size ? article.size.trim() : '',
+        quantity: safeQuantity || '1', size: article.size ? String(article.size).trim() : '',
         completed: false
     };
     await updateDoc(getListRef(), { articles: arrayUnion(newArticle) });
@@ -282,7 +283,36 @@ export default function ListEditScreen({ route, navigation }) {
   };
 
   const handleScan = async (scannedInfo) => {
-    // ... (rest of the function is unchanged)
+    // Wird teilweise mehrfach gefeuert -> hartes Gate
+    if (isProcessingScan.current) return;
+    isProcessingScan.current = true;
+
+    try {
+      const name = String(scannedInfo?.name ?? '').trim();
+      const quantity = String(scannedInfo?.quantity ?? '1').trim();
+      const size = String(scannedInfo?.size ?? '').trim();
+
+      if (!name) {
+        setSnackbarMessage('Kein Produktname erkannt.');
+        setSnackbarVisible(true);
+        return;
+      }
+
+      await addArticleToList({ name, quantity, size });
+      setSnackbarMessage(`'${name}' hinzugefügt`);
+      setSnackbarVisible(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error('[ERROR] handleScan:', error);
+      setSnackbarMessage('Fehler beim Hinzufügen des Artikels.');
+      setSnackbarVisible(true);
+    } finally {
+      setIsBarcodeModalVisible(false);
+      // kleines Delay, damit ein zweiter Scan-Event nicht direkt doppelt hinzufügt
+      setTimeout(() => {
+        isProcessingScan.current = false;
+      }, 500);
+    }
   };
   
   const openBarcodeScanner = () => {

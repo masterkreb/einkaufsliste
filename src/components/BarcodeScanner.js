@@ -26,16 +26,11 @@ export default function BarcodeScannerComponent({ onScan, onClose }) {
   };
 
   const handleBarCodeScanned = async ({ bounds, data }) => {
+    console.log('Barcode scanned:', data);
     if (scanned || loading) return;
 
-    const { origin, size } = bounds;
-    const targetY = viewDimensions.height / 2;
-    const barcodeCenterY = origin.y + (size.height / 2);
-    
-    const tolerance = 40;
-    if (Math.abs(targetY - barcodeCenterY) > tolerance) {
-        return;
-    }
+    // NOTE: Der frühere "Linien-/Toleranz"-Check hat sehr oft alle Scans blockiert
+    // (je nach Gerät liefern bounds andere Werte oder gar keine). Deshalb hier entfernt.
 
     setScanned(true);
     setLoading(true);
@@ -62,6 +57,13 @@ export default function BarcodeScannerComponent({ onScan, onClose }) {
         name: fullProductName,
         quantity: '1',
       });
+
+      setLoading(false);
+      // Scanner wird i.d.R. vom Parent geschlossen; falls nicht, blocken wir Mehrfach-Scans
+      // bis zum Schließen/erneuten Öffnen.
+      setTimeout(() => {
+        onClose?.();
+      }, 0);
 
     } catch (err) {
       console.log('API Error:', err);
@@ -92,7 +94,7 @@ export default function BarcodeScannerComponent({ onScan, onClose }) {
         facing="back"
         onBarcodeScanned={handleBarCodeScanned}
         barcodeScannerSettings={{
-            barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e"],
+            barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128", "code39", "qr"],
         }}
       />
 
@@ -106,7 +108,12 @@ export default function BarcodeScannerComponent({ onScan, onClose }) {
       <SafeAreaView style={styles.bottomContainer}>
         <Button 
             mode="contained" 
-            onPress={onClose} 
+            onPress={() => {
+              setScanned(false);
+              setLoading(false);
+              setError(null);
+              onClose?.();
+            }} 
             style={styles.cancelButton}
             labelStyle={styles.cancelButtonLabel}
         >
