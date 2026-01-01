@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { TextInput, Button, Text, Title, Subheading } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
@@ -112,7 +113,10 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAwareScrollView
+      style={styles.container}
+      contentContainerStyle={styles.inner}
+    >
       <View style={styles.headerContainer}>
         <Title style={styles.headerTitle}>Familien-Einkaufsliste</Title>
         <Subheading style={styles.subheading}>Einfach. Synchronisiert. Geteilt.</Subheading>
@@ -136,6 +140,7 @@ export default function LoginScreen({ navigation }) {
         secureTextEntry 
         disabled={loading} 
         style={styles.input}
+        onSubmitEditing={handlePrimaryAction}
       />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -170,13 +175,16 @@ export default function LoginScreen({ navigation }) {
           Passwort vergessen
         </Button>
       )}
-    </View>
+    </KeyboardAwareScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  inner: {
+    flexGrow: 1,
     padding: 20,
     justifyContent: 'center',
   },
@@ -185,7 +193,7 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   headerTitle: {
-    fontSize: 28, // Bigger font size for the main title
+    fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
   },
@@ -193,24 +201,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginTop: 8,
-    color: '#666', // A slightly muted color for the slogan
+    color: '#666',
   },
   title: {
     textAlign: 'center',
     marginBottom: 24,
   },
   input: {
-    marginBottom: 12, // Increased margin for better spacing
+    marginBottom: 12,
   },
   error: {
-    color: '#D32F2F', // A standard error color
+    color: '#D32F2F',
     marginVertical: 10,
     textAlign: 'center',
     fontSize: 14,
   },
   button: {
     marginTop: 16,
-    paddingVertical: 8, // Make button a bit taller
+    paddingVertical: 8,
   },
   switchButton: {
     marginTop: 12,
