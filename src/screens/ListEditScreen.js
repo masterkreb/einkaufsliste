@@ -4,7 +4,7 @@ import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, SafeAreaV
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { Menu, IconButton, TextInput, Checkbox, Text, Button, Portal, Dialog, Snackbar, Icon } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
-import { doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, setDoc, deleteDoc } from 'firebase/firestore';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import BarcodeScannerComponent from '../components/BarcodeScanner';
@@ -368,14 +368,11 @@ export default function ListEditScreen({ route, navigation }) {
       });
       console.log('SharedList updated');
   
-      // Find the user's private list document to update it
+      // Find the user's private list document to delete it
       const userPrivateListRef = doc(db, `users/${memberUid}/lists`, sharedListId);
-      console.log('Updating userPrivateList for', memberUid, 'sharedListId:', sharedListId);
-      await updateDoc(userPrivateListRef, {
-        isShared: false,
-        sharedListId: null,
-      });
-      console.log('UserPrivateList updated');
+      console.log('Deleting userPrivateList for', memberUid, 'sharedListId:', sharedListId);
+      await deleteDoc(userPrivateListRef);
+      console.log('UserPrivateList deleted');
   
       setSnackbarMessage(`'${memberToRemove.email}' wurde entfernt.`);
       setSnackbarVisible(true);

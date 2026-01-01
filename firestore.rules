@@ -27,6 +27,10 @@ service cloud.firestore {
                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isShared', 'sharedListId']) &&
                      resource.data.isShared == true &&
                      request.resource.data.isShared == false;
+
+      // Allow the creator to delete the private list after removing the user.
+      allow delete: if isSignedIn() &&
+                     get(/databases/$(database)/documents/sharedLists/$(resource.data.sharedListId)).data.createdBy == request.auth.uid;
     }
 
     match /sharedLists/{listId} {
