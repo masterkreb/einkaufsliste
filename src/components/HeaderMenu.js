@@ -41,7 +41,7 @@ const HeaderMenu = ({ navigation }) => {
   return (
     <View style={{ flexDirection: 'row' }}>
       <Menu
-        key={menuKey} // The key prop is the magic here!
+        key={menuKey} // Der key sorgt dafür, dass die Komponente bei jedem Öffnen neu erstellt wird.
         visible={visible}
         onDismiss={closeMenu}
         anchor={<IconButton icon="dots-vertical" onPress={openMenu} />}
