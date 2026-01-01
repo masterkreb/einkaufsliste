@@ -8,7 +8,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 // Import screen components
 import StartScreen from '../screens/StartScreen';
 import ListEditScreen from '../screens/ListEditScreen';
-import ArticleDetailsScreen from '../screens/ArticleDetailsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import LoadingScreen from '../screens/LoadingScreen';
 
@@ -56,11 +55,6 @@ export default function AppNavigator() {
               name="ListEdit" 
               component={ListEditScreen} 
               options={{ title: 'Liste bearbeiten' }}
-            />
-            <Stack.Screen 
-              name="ArticleDetails" 
-              component={ArticleDetailsScreen} 
-              options={{ title: 'Artikeldetails' }}
             />
           </>
         ) : (

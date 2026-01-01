@@ -1,16 +1,10 @@
 ﻿Informatik 
-Modul 335 – Kompetenznachweis 
- 
-
- 
-    
+Modul 335 – Kompetenznachweis    
 
  
 Kompetenznachweis 335:  
 App mit 2 Elementen planen, 
-entwickeln und publizieren 
- 
- 
+entwickeln und publizieren  
  
  
 Ausgangslage: 
@@ -35,79 +29,39 @@ Abgabe:  ✓ Abgabe über ein GitHub Repository oder
 Dokument (.pdf) 
 
 ✓ Selbstbewertung im Excel Sheet! 
-
  
 
-1 Aufgabe 1: Mobile App – Anforderungen und Planung  
+1 Aufgabe 1: Mobile App – Anforderungen und Planung
+
 a) Erstellen Sie die Planung einer mobile App nach einer eigenen Idee, dazu erstellen sie 
 
 geeignete Screen Skizzen ihrer Idee auf Papier in einer Art Storyboard in welchem Sie den 
-Ablauf der Screen-Folgen darstellen. Sie listen alle Funktionalitäten auf! 
- 
-
-                                        
-                                        
-                                        
-
- 
+Ablauf der Screen-Folgen darstellen. Sie listen alle Funktionalitäten auf!                                
+                                                                          
 b) Die Mobile –App muss: 
 
 a. 2 Aktoren/Sensoren, 1 persistente Storage (z.B. firebase – firestore) und  
-1 Authentifizierung (z.B. firebase – Authentifizierung). 
-
-                                        
-                                        
-                                        
-                                        
-                                        
-
+1 Authentifizierung (z.B. firebase – Authentifizierung).                                       
  
 c) Erstellen Sie hier einen Testplan (Anwendungsfälle als Testfälle) in dem ersichtlich ist wie 
-
-Sie die App am Ende testen werden! 
- 
-
-                                        
-                                        
-                                        
+Sie die App am Ende testen werden!
                                         
 
 08_Kompetenznachweis_335.docx  / 19.12.2025  1 
 Informatik Luigi Cavuoti 
 
- 
-
-
-
 Informatik 
-Modul 335 – Kompetenznachweis 
- 
+Modul 335 – Kompetenznachweis    
 
- 
-    
+2 Aufgabe 2: Mobile App – Lösungskonzept erarbeiten
 
-2 Aufgabe 2: Mobile App – Lösungskonzept erarbeiten  
 a) Beschreiben Sie kurz wie sie die Mobile App entwickeln werden, mit welchem Framework 
-
 und was für ein Typ der Mobilen App es sein wird (native App, Hybrid, WebApp). Der 
-aufbau und die wichtigsten Komponenten werden hier beschrieben. 
- 
-
+aufbau und die wichtigsten Komponenten werden hier beschrieben.  
                                         
+b) Beschreiben Sie genau welche Elemente und wie Sie die Aktoren/Sensoren, die persistente
+speicherung, die Authentifizierung oder das Lokal Storage benutzen werden!
                                         
-                                        
-                                        
-                                        
-b) Beschreiben Sie genau welche Elemente und wie Sie die Aktoren/Sensoren, die persistente 
-
-speicherung, die Authentifizierung oder das Lokal Storage benutzen werden!  
-                                        
-                                        
-                                        
-                                        
-                                        
-
- 
  
 Aufgabe 3: Mobile App – Mobile App programmieren  
 Implementieren Sie die App mit einem geeigneten Framework und Entwicklungsoberfläche! Und 
@@ -115,48 +69,21 @@ verwalten es auf GitHub oder .zip!
 
 a) Mobile App - funktionalität und MockUps wie geplant umgesetzt. (Ziele erreicht!) 
 b) Mobile App - die Sensoren wie geplant umgesetzt. (Ziele erreicht). 
-
  
-                                        
-                                        
-                                        
-                                        
-                                        
-
- 
- 
- 
- 
+  
 Aufgabe 4: Mobile App – Mobile App publizieren  
 
 a) Beschreiben Sie hier die nötigen Schritte durch um die App zu publizieren! 
 b) Das Produkt muss eine fertig paketierte Datei (.apk) sein welche zum publizieren auf dem 
 
 App-Store oder Google Play Store bereit ist! Beschreiben Sie die Schritte in der 
-Dokumentation. 
-
- 
-                                        
-                                        
-                                        
-                                        
-                                        
+Dokumentation.                  
 
  
 Aufgabe 5: Mobile App gemäss Testplan überprüfen   
 
 a) Führen Sie hier die nötigen Tests gemäss Testplan aus und halten Sie die Ergebnisse fest 
 bezüglich funktionalen Tests! Die erforderlichen Korrekturen wurden vorgenommen. 
-
- 
-                                        
-                                        
-                                        
-                                        
-                                        
-
- 
- 
 
 08_Kompetenznachweis_335.docx  / 19.12.2025  2 
 Informatik Luigi Cavuoti
