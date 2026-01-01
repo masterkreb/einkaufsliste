@@ -60,7 +60,7 @@ export default function BarcodeScannerComponent({ onScan, onClose }) {
 
       setLoading(false);
       // Scanner wird i.d.R. vom Parent geschlossen; falls nicht, blocken wir Mehrfach-Scans
-      // bis zum Schließen/erneuten Öffnen.
+      // bis zum Schliessen/erneuten Öffnen.
       setTimeout(() => {
         onClose?.();
       }, 0);
