@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { TextInput, Button, Text, Title, Subheading } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { collection, getDocs, writeBatch, doc, setDoc } from 'firebase/firestore';
 import { loadListsLocally, saveListsLocally } from '../services/asyncStorage';
 
 export default function LoginScreen({ navigation }) {
@@ -81,6 +81,9 @@ export default function LoginScreen({ navigation }) {
 
   const syncLocalAndFirebaseData = async (user) => {
     if (!user) return;
+
+    // Ensure user document exists
+    await setDoc(doc(db, 'users', user.uid), { email: user.email }, { merge: true });
 
     const localLists = await loadListsLocally();
     if (localLists.length === 0) return;

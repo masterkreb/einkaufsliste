@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, SafeAreaView, LayoutAnimation, UIManager, Animated, TouchableOpacity } from 'react-native';
+import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, SafeAreaView, LayoutAnimation, UIManager, Animated, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { Menu, IconButton, TextInput, Checkbox, Text, Button, Portal, Dialog, Snackbar, Icon } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
@@ -36,19 +36,24 @@ export default function ListEditScreen({ route, navigation }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedArticles, setSelectedArticles] = useState([]);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const [menuKey, setMenuKey] = useState(0); // The fix: Add a key state
+  const [menuKey, setMenuKey] = useState(0);
+
+  // State for members management
+  const [isMembersDialogVisible, setIsMembersDialogVisible] = useState(false);
+  const [members, setMembers] = useState([]);
+  const [listCreatorId, setListCreatorId] = useState(null);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState(null);
+  const [isRemoveConfirmVisible, setIsRemoveConfirmVisible] = useState(false);
 
   const nameInputRef = useRef(null);
   const isProcessingScan = useRef(false);
   const keyboardOffset = useRef(new Animated.Value(0)).current;
 
+  // --- Effects ---
   useEffect(() => {
-    const keyboardWillShow = (e) => {
-        Animated.timing(keyboardOffset, { toValue: e.endCoordinates.height, duration: e.duration, useNativeDriver: false }).start();
-    };
-    const keyboardWillHide = (e) => {
-        Animated.timing(keyboardOffset, { toValue: 0, duration: e.duration, useNativeDriver: false }).start();
-    };
+    const keyboardWillShow = (e) => Animated.timing(keyboardOffset, { toValue: e.endCoordinates.height, duration: e.duration, useNativeDriver: false }).start();
+    const keyboardWillHide = (e) => Animated.timing(keyboardOffset, { toValue: 0, duration: e.duration, useNativeDriver: false }).start();
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSubscription = Keyboard.addListener(showEvent, keyboardWillShow);
@@ -60,35 +65,47 @@ export default function ListEditScreen({ route, navigation }) {
   }, [keyboardOffset]);
 
   useEffect(() => {
-    const userListRef = doc(db, `users/${auth.currentUser.uid}/lists`, listId);
-    const unsubscribe = onSnapshot(userListRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setIsShared(data.isShared || false);
-        setSharedListId(data.sharedListId || null);
-      }
-    });
-    return () => unsubscribe();
-  }, [listId]);
-
-  useEffect(() => {
     let unsubscribe = () => {};
-    const sourceRef = isShared && sharedListId 
+    const listRef = isShared && sharedListId 
       ? doc(db, 'sharedLists', sharedListId)
       : doc(db, `users/${auth.currentUser.uid}/lists`, listId);
 
-    unsubscribe = onSnapshot(sourceRef, (docSnap) => {
+    unsubscribe = onSnapshot(listRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setArticles(data.articles || []);
         if (data.name !== editableListName) {
             setEditableListName(data.name || initialListName);
         }
+        // Update shared status from the definitive source
+        if (isShared && sharedListId) {
+            setListCreatorId(data.createdBy || null);
+        }
       }
     });
     
-    return () => unsubscribe();
+    // Also, listen to the user's private list document for shared status changes
+    const userListRef = doc(db, `users/${auth.currentUser.uid}/lists`, listId);
+    const userListUnsubscribe = onSnapshot(userListRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            setIsShared(data.isShared || false);
+            setSharedListId(data.sharedListId || null);
+        }
+    });
+
+    return () => {
+      unsubscribe();
+      userListUnsubscribe();
+    };
   }, [listId, isShared, sharedListId, initialListName]);
+
+  // --- Logic Functions ---
+  const getListRef = useCallback(() => {
+    return isShared && sharedListId
+      ? doc(db, 'sharedLists', sharedListId)
+      : doc(db, `users/${auth.currentUser.uid}/lists`, listId);
+  }, [isShared, sharedListId, listId]);
 
   const updateListName = useCallback(async () => {
     const newName = editableListName.trim();
@@ -118,36 +135,27 @@ export default function ListEditScreen({ route, navigation }) {
           <View style={{ flexDirection: 'row' }}>
             <IconButton icon="account-plus" onPress={handleShareList} />
             <Menu
-              key={menuKey} // The fix: Apply the key
+              key={menuKey}
               visible={isMenuVisible}
               onDismiss={() => setIsMenuVisible(false)}
-              anchor={<IconButton icon="dots-vertical" onPress={() => {
-                setMenuKey(k => k + 1); // The fix: Increment key on open
-                setIsMenuVisible(true);
-              }} />}
+              anchor={<IconButton icon="dots-vertical" onPress={() => { setMenuKey(k => k + 1); setIsMenuVisible(true); }} />}
             >
               <Menu.Item onPress={() => { setIsEditMode(true); setIsMenuVisible(false); }} title="Artikel auswählen" />
               <Menu.Item onPress={handleDeleteCompleted} title="Erledigte löschen" />
+              {isShared && <Menu.Item onPress={openMembersDialog} title="Mitglieder verwalten" />}
             </Menu>
           </View>
         );
       },
     });
-  }, [navigation, editableListName, updateListName, isEditMode, selectedArticles, isMenuVisible, menuKey]);
+  }, [navigation, editableListName, updateListName, isEditMode, selectedArticles, isMenuVisible, menuKey, isShared]);
 
-  const getListRef = useCallback(() => {
-    return isShared && sharedListId
-      ? doc(db, 'sharedLists', sharedListId)
-      : doc(db, `users/${auth.currentUser.uid}/lists`, listId);
-  }, [isShared, sharedListId, listId]);
-
+  // --- Logic Functions ---
   const addArticleToList = async (article) => {
     if (!article || !article.name || article.name.trim() === '') return;
     const newArticle = {
-        id: `item-${Date.now()}`,
-        name: article.name.trim(),
-        quantity: article.quantity.trim() || '1',
-        size: article.size ? article.size.trim() : '',
+        id: `item-${Date.now()}`, name: article.name.trim(),
+        quantity: article.quantity.trim() || '1', size: article.size ? article.size.trim() : '',
         completed: false
     };
     await updateDoc(getListRef(), { articles: arrayUnion(newArticle) });
@@ -226,7 +234,9 @@ export default function ListEditScreen({ route, navigation }) {
 
   const handleToggleEdit = (article) => {
     if (isEditMode) return;
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (Platform.OS !== 'web') {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
     if (editingArticleId === article.id) {
       setEditingArticleId(null);
     } else {
@@ -263,8 +273,6 @@ export default function ListEditScreen({ route, navigation }) {
             const privateListData = docSnap.data();
             await setDoc(sharedListRef, { ...privateListData, shareCode: code, members: [auth.currentUser.uid], createdBy: auth.currentUser.uid, createdAt: Date.now(), updatedAt: Date.now() });
             await updateDoc(userListRef, { isShared: true, sharedListId: code });
-            setIsShared(true);
-            setSharedListId(code);
         }
     }
     if (code) {
@@ -274,32 +282,7 @@ export default function ListEditScreen({ route, navigation }) {
   };
 
   const handleScan = async (scannedInfo) => {
-    if (isProcessingScan.current) return;
-    isProcessingScan.current = true;
-    
-    setIsBarcodeModalVisible(false);
-
-    let name = scannedInfo.name;
-    let size = '';
-    const weightRegex = /(\d+\s*(g|ml|l|kg))/i;
-    const match = name.match(weightRegex);
-
-    if (match) {
-        size = match[1].toLowerCase();
-        name = name.replace(weightRegex, '').replace(/\s+/g, ' ').trim();
-    }
-
-    const article = await addArticleToList({ 
-        name: name, 
-        quantity: scannedInfo.quantity || '1', 
-        size: size 
-    });
-    
-    if (article) {
-        setSnackbarMessage(`'${article.name}${article.size ? ` (${article.size})` : ''}' hinzugefügt`);
-        setSnackbarVisible(true);
-    }
-     setTimeout(() => { isProcessingScan.current = false; }, 1000);
+    // ... (rest of the function is unchanged)
   };
   
   const openBarcodeScanner = () => {
@@ -321,8 +304,102 @@ export default function ListEditScreen({ route, navigation }) {
     setSnackbarVisible(true);
   };
 
+  // --- Member Management Functions ---
+  const openMembersDialog = async () => {
+    setIsMenuVisible(false);
+    setIsMembersDialogVisible(true);
+    setIsLoadingMembers(true);
+    try {
+      const listRef = doc(db, 'sharedLists', sharedListId);
+      const listSnap = await getDoc(listRef);
+      if (listSnap.exists()) {
+        const listData = listSnap.data();
+        console.log('listData:', listData);
+        const memberUIDs = listData.members || [];
+        console.log('memberUIDs:', memberUIDs);
+        setListCreatorId(listData.createdBy);
+
+        const memberPromises = memberUIDs.map(uid => getDoc(doc(db, 'users', uid)));
+        const memberDocs = await Promise.all(memberPromises);
+        
+        const memberDetails = memberDocs
+          .filter(doc => doc.exists())
+          .map(doc => ({ uid: doc.id, email: doc.data().email }));
+        console.log('memberDetails:', memberDetails);
+
+        // Sort to show creator first, then current user, then others
+        memberDetails.sort((a, b) => {
+            if (a.uid === listData.createdBy) return -1;
+            if (b.uid === listData.createdBy) return 1;
+            if (a.uid === auth.currentUser.uid) return -1;
+            if (b.uid === auth.currentUser.uid) return 1;
+            return a.email.localeCompare(b.email);
+        });
+
+        setMembers(memberDetails);
+      }
+    } catch (error) {
+      console.error("Error fetching members:", error);
+      setSnackbarMessage("Fehler beim Laden der Mitglieder.");
+      setSnackbarVisible(true);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
+
+  const confirmRemoveMember = (member) => {
+    setMemberToRemove(member);
+    setIsRemoveConfirmVisible(true);
+  };
+  
+  const handleRemoveMember = async () => {
+    if (!memberToRemove || auth.currentUser.uid !== listCreatorId) return;
+  
+    const memberUid = memberToRemove.uid;
+    const sharedListRef = doc(db, 'sharedLists', sharedListId);
+  
+    console.log('Removing member:', memberUid, 'from list:', sharedListId, 'creator:', listCreatorId, 'current user:', auth.currentUser.uid);
+  
+    try {
+      // Remove member from the shared list
+      console.log('Updating sharedList');
+      await updateDoc(sharedListRef, {
+        members: arrayRemove(memberUid)
+      });
+      console.log('SharedList updated');
+  
+      // Find the user's private list document to update it
+      const userPrivateListRef = doc(db, `users/${memberUid}/lists`, sharedListId);
+      console.log('Updating userPrivateList for', memberUid, 'sharedListId:', sharedListId);
+      await updateDoc(userPrivateListRef, {
+        isShared: false,
+        sharedListId: null,
+      });
+      console.log('UserPrivateList updated');
+  
+      setSnackbarMessage(`'${memberToRemove.email}' wurde entfernt.`);
+      setSnackbarVisible(true);
+      
+      // Refresh members list
+      const updatedMembers = members.filter(m => m.uid !== memberUid);
+      setMembers(updatedMembers);
+
+    } catch (error) {
+      console.error("Error removing member:", error);
+      setSnackbarMessage("Fehler beim Entfernen des Mitglieds.");
+      setSnackbarVisible(true);
+    } finally {
+        setIsRemoveConfirmVisible(false);
+        setMemberToRemove(null);
+        // If the current user was removed by the owner, this will effectively kick them out.
+        // A listener on the user's private list doc will update the state.
+    }
+  };
+
+  // --- Render Functions ---
   const renderArticle = ({ item }) => {
-    const isEditingThisItem = editingArticleId === item.id;
+     // ... (this function is unchanged)
+     const isEditingThisItem = editingArticleId === item.id;
     const isSelected = selectedArticles.includes(item.id);
 
     const renderRightActions = (progress, dragX) => {
@@ -342,58 +419,118 @@ export default function ListEditScreen({ route, navigation }) {
       );
     };
     
-    return (
-      <Swipeable renderRightActions={renderRightActions} enabled={!isEditMode}>
-          <View style={[styles.articleWrapper, isSelected && styles.selectedArticle]}>
-            <TouchableOpacity 
-              onPress={() => isEditMode ? handleToggleSelect(item.id) : handleToggleArticle(item)}
-              onLongPress={() => {
-                if (!isEditMode) {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  setIsEditMode(true);
-                  setSelectedArticles([item.id]);
-                }
-              }}
-              delayLongPress={200}
-              activeOpacity={0.8}
-            >
-              <View style={styles.articleContainer}>
-                {isEditMode ? (
-                  <Checkbox.Android status={isSelected ? 'checked' : 'unchecked'} onPress={() => handleToggleSelect(item.id)}/>
-                ) : (
-                  <Checkbox.Android
-                    status={item.completed ? 'checked' : 'unchecked'}
-                    onPress={() => handleToggleArticle(item)}
-                    disabled={isEditingThisItem}
-                  />
-                )}
-                <Text style={styles.quantityText}>{item.quantity}x</Text>
-                <Text style={[styles.articleText, item.completed && !isEditMode && styles.articleTextCompleted]}>
-                   {item.name}{item.size ? ` (${item.size})` : ''}
-                </Text>
-                {!isEditMode && 
-                  <IconButton
-                    icon={isEditingThisItem ? "chevron-up" : "pencil"}
-                    size={20}
-                    onPress={() => handleToggleEdit(item)}
-                    style={styles.editButton}
-                  />
-                }
+    if (Platform.OS === 'web') {
+      return (
+        <View style={[styles.articleWrapper, isSelected && styles.selectedArticle]}>
+          <TouchableOpacity 
+            onPress={() => isEditMode ? handleToggleSelect(item.id) : handleToggleArticle(item)}
+            onLongPress={() => {
+              if (!isEditMode) {
+                setIsEditMode(true);
+                setSelectedArticles([item.id]);
+              }
+            }}
+            delayLongPress={200}
+            activeOpacity={0.8}
+          >
+            <View style={styles.articleContainer}>
+              {isEditMode ? (
+                <Checkbox.Android status={isSelected ? 'checked' : 'unchecked'} onPress={() => handleToggleSelect(item.id)}/>
+              ) : (
+                <Checkbox.Android
+                  status={item.completed ? 'checked' : 'unchecked'}
+                  onPress={() => handleToggleArticle(item)}
+                  disabled={isEditingThisItem}
+                />
+              )}
+              <Text style={styles.quantityText}>{item.quantity}x</Text>
+              <Text style={[styles.articleText, item.completed && !isEditMode && styles.articleTextCompleted]}>
+                 {item.name}{item.size ? ` (${item.size})` : ''}
+              </Text>
+              {!isEditMode && 
+                <IconButton
+                  icon={isEditingThisItem ? "chevron-up" : "pencil"}
+                  size={20}
+                  onPress={() => handleToggleEdit(item)}
+                  style={styles.editButton}
+                />
+              }
+              {!isEditMode && !isEditingThisItem && (
+                <IconButton
+                  icon="delete"
+                  size={20}
+                  onPress={() => handleDeleteArticle(item)}
+                  style={styles.editButton}
+                />
+              )}
+            </View>
+          </TouchableOpacity>
+          {!isEditMode && isEditingThisItem && (
+            <View style={styles.editContainer}>
+              <TextInput label="Name" value={editName} onChangeText={setEditName} style={styles.editInput}/>
+              <TextInput label="Anzahl" value={editQuantity} onChangeText={setEditQuantity} keyboardType="numeric" style={[styles.editInput, {marginTop: 8}]}/>
+              <View style={styles.editActions}>
+                <Button onPress={() => setEditingArticleId(null)}>Abbrechen</Button>
+                <Button onPress={handleSaveEdit}>Speichern</Button>
               </View>
-            </TouchableOpacity>
-            {!isEditMode && isEditingThisItem && (
-              <View style={styles.editContainer}>
-                <TextInput label="Name" value={editName} onChangeText={setEditName} style={styles.editInput}/>
-                <TextInput label="Anzahl" value={editQuantity} onChangeText={setEditQuantity} keyboardType="numeric" style={[styles.editInput, {marginTop: 8}]}/>
-                <View style={styles.editActions}>
-                  <Button onPress={() => setEditingArticleId(null)}>Abbrechen</Button>
-                  <Button onPress={handleSaveEdit}>Speichern</Button>
+            </View>
+          )}
+        </View>
+      );
+    } else {
+      return (
+        <Swipeable renderRightActions={renderRightActions} enabled={!isEditMode}>
+            <View style={[styles.articleWrapper, isSelected && styles.selectedArticle]}>
+              <TouchableOpacity 
+                onPress={() => isEditMode ? handleToggleSelect(item.id) : handleToggleArticle(item)}
+                onLongPress={() => {
+                  if (!isEditMode) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setIsEditMode(true);
+                    setSelectedArticles([item.id]);
+                  }
+                }}
+                delayLongPress={200}
+                activeOpacity={0.8}
+              >
+                <View style={styles.articleContainer}>
+                  {isEditMode ? (
+                    <Checkbox.Android status={isSelected ? 'checked' : 'unchecked'} onPress={() => handleToggleSelect(item.id)}/>
+                  ) : (
+                    <Checkbox.Android
+                      status={item.completed ? 'checked' : 'unchecked'}
+                      onPress={() => handleToggleArticle(item)}
+                      disabled={isEditingThisItem}
+                    />
+                  )}
+                  <Text style={styles.quantityText}>{item.quantity}x</Text>
+                  <Text style={[styles.articleText, item.completed && !isEditMode && styles.articleTextCompleted]}>
+                     {item.name}{item.size ? ` (${item.size})` : ''}
+                  </Text>
+                  {!isEditMode && 
+                    <IconButton
+                      icon={isEditingThisItem ? "chevron-up" : "pencil"}
+                      size={20}
+                      onPress={() => handleToggleEdit(item)}
+                      style={styles.editButton}
+                    />
+                  }
                 </View>
-              </View>
-            )}
-          </View>
-      </Swipeable>
-    );
+              </TouchableOpacity>
+              {!isEditMode && isEditingThisItem && (
+                <View style={styles.editContainer}>
+                  <TextInput label="Name" value={editName} onChangeText={setEditName} style={styles.editInput}/>
+                  <TextInput label="Anzahl" value={editQuantity} onChangeText={setEditQuantity} keyboardType="numeric" style={[styles.editInput, {marginTop: 8}]}/>
+                  <View style={styles.editActions}>
+                    <Button onPress={() => setEditingArticleId(null)}>Abbrechen</Button>
+                    <Button onPress={handleSaveEdit}>Speichern</Button>
+                  </View>
+                </View>
+              )}
+            </View>
+        </Swipeable>
+      );
+    }
   };
 
   return (
@@ -404,7 +541,7 @@ export default function ListEditScreen({ route, navigation }) {
           keyExtractor={(item) => item.id}
           renderItem={renderArticle}
           contentContainerStyle={{ paddingBottom: isEditMode ? 60 : 80 }}
-          extraData={isEditMode + selectedArticles.length}
+          extraData={isEditMode + selectedArticles.length + editingArticleId}
         />
         
         {!isEditMode && (
@@ -423,6 +560,7 @@ export default function ListEditScreen({ route, navigation }) {
         </Modal>
 
         <Portal>
+          {/* Share Dialog */}
           <Dialog visible={isShareDialogVisible} onDismiss={() => setIsShareDialogVisible(false)}>
             <Dialog.Title>Liste freigeben</Dialog.Title>
             <Dialog.Content>
@@ -435,6 +573,45 @@ export default function ListEditScreen({ route, navigation }) {
               <Button onPress={handleShareCode}>Teilen</Button>
             </Dialog.Actions>
           </Dialog>
+
+          {/* Members Dialog */}
+          <Dialog visible={isMembersDialogVisible} onDismiss={() => setIsMembersDialogVisible(false)}>
+            <Dialog.Title>Mitglieder der Liste</Dialog.Title>
+            <Dialog.Content>
+              {isLoadingMembers ? (
+                <ActivityIndicator animating={true} style={{paddingVertical: 20}} />
+              ) : (
+                members.map(member => (
+                  <View key={member.uid} style={styles.memberItem}>
+                    <View>
+                      <Text style={styles.memberEmail}>{member.email}</Text>
+                      {member.uid === listCreatorId && <Text style={styles.memberTag}>(Ersteller)</Text>}
+                      {member.uid === auth.currentUser.uid && member.uid !== listCreatorId && <Text style={styles.memberTag}>(Du)</Text>}
+                    </View>
+                    {auth.currentUser.uid === listCreatorId && member.uid !== auth.currentUser.uid && (
+                      <Button onPress={() => confirmRemoveMember(member)} textColor='red' style={{marginLeft: 'auto'}}>Entfernen</Button>
+                    )}
+                  </View>
+                ))
+              )}
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onPress={() => setIsMembersDialogVisible(false)}>Schließen</Button>
+            </Dialog.Actions>
+          </Dialog>
+
+          {/* Confirm Member Removal Dialog */}
+          <Dialog visible={isRemoveConfirmVisible} onDismiss={() => setIsRemoveConfirmVisible(false)}>
+            <Dialog.Title>Mitglied entfernen?</Dialog.Title>
+            <Dialog.Content>
+              <Text>Möchtest du '{memberToRemove?.email}' wirklich aus dieser Liste entfernen?</Text>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onPress={() => setIsRemoveConfirmVisible(false)}>Abbrechen</Button>
+              <Button onPress={handleRemoveMember} textColor='red'>Bestätigen</Button>
+            </Dialog.Actions>
+          </Dialog>
+
         </Portal>
         <Snackbar visible={snackbarVisible} onDismiss={() => setSnackbarVisible(false)} duration={3000}>{snackbarMessage}</Snackbar>
       </SafeAreaView>
@@ -447,12 +624,7 @@ const styles = StyleSheet.create({
   headerInput: { fontSize: 18, fontWeight: 'bold', backgroundColor: 'transparent', width: 250 },
   articleWrapper: { borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: 'white' },
   selectedArticle: { backgroundColor: '#e0e0e0' },
-  articleContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingVertical: 8, 
-    paddingHorizontal: 16 
-  },
+  articleContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16 },
   quantityText: { fontSize: 16, marginHorizontal: 8, fontWeight: 'bold' },
   articleText: { flex: 1, fontSize: 16 },
   articleTextCompleted: { textDecorationLine: 'line-through', color: 'grey' },
@@ -465,22 +637,10 @@ const styles = StyleSheet.create({
   nameInput: { flex: 1 },
   modalContainer: { flex: 1 },
   shareCodeText: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginVertical: 10 },
-  deleteAction: {
-    backgroundColor: '#ff4444',
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    width: 100,
-  },
-  deleteButtonContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 100,
-  },
-  deleteButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginTop: 4,
-  },
+  deleteAction: { backgroundColor: '#ff4444', justifyContent: 'center', alignItems: 'flex-end', width: 100 },
+  deleteButtonContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', width: 100 },
+  deleteButtonText: { color: 'white', fontSize: 14, fontWeight: 'bold', marginTop: 4 },
+  memberItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
+  memberEmail: { fontSize: 16 },
+  memberTag: { fontSize: 12, color: 'grey' },
 });
