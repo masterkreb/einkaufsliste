@@ -138,12 +138,17 @@ Diese App ermöglicht es Familienmitgliedern, gemeinsame Einkaufslisten zu erste
   /navigation
     - AppNavigator.js      → Navigation Setup
 
+/docs                  # Dokumentation
+  - Aufgabe.txt            → Aufgabenstellung
+  - Handlungsziele...      → Kompetenzraster
+
 /.env                  # Umgebungsvariabeln für Firebase
 /.gitignore            # Git Ignor Liste
 /App.js                # Root-Komponente
 /app.json              # Expo-Konfiguration
 /firestore.rules       # Firebase Security Rules
 /package.json          # Abhängigkeiten
+/Readme.md             # Diese Dokumentation
 ```
 
 **Wichtige Komponenten:**
