@@ -354,38 +354,55 @@ Um eine React Native App im Google Play Store zu veröffentlichen, sind folgende
 **Vorbereitung:**
 1. **Expo Account erstellen** auf https://expo.dev
 2. **EAS CLI installieren:** `npm install -g eas-cli`
-3. **Bei EAS anmelden:** `eas login`
+3. **Bei EAS anmelden:** `eas login (die Anmeldedaten von expo.dev)`
 4. **Projekt konfigurieren:** `eas build:configure`
 
 **APK erstellen (für Android):**
 
 1. **Build-Profil in `eas.json` erstellen:**
    ```json
-   {
-     "build": {
-       "preview": {
-         "android": {
-           "buildType": "apk"
-         }
-       },
-       "production": {}
-     }
-   }
+    {
+      "cli": {
+        "version": ">= 16.28.0",
+        "appVersionSource": "remote"
+      },
+      "build": {
+        "development": {
+          "developmentClient": true,
+          "distribution": "internal"
+        },
+        "preview": {
+          "distribution": "internal",
+          "android": {
+            "buildType": "apk"
+          }
+        },
+        "production": {
+          "autoIncrement": true
+        }
+      },
+      "submit": {
+        "production": {}
+      }
+    }
    ```
 
 2. **APK-Build starten:**
    ```bash
    eas build --platform android --profile preview
    ```
+   Während des Builds wurden folgende Fragen gestellt:
+  - **Application ID:** `com.sheziren.familieneinkaufsliste` (eindeutige App-Kennung)
+  - **Keystore generieren:** Ja (digitale Signatur für die App)
 
 3. **Warten bis Build fertig ist** (ca. 10-20 Minuten)
-   - Der Build läuft auf Expo-Servern
-   - Man bekommt eine E-Mail wenn fertig
+   - Der Build läuft auf Expo-Servern   
 
 4. **APK herunterladen:**
    - Über das EAS Dashboard (https://expo.dev)
-   - Oder direkt via Link in der E-Mail
+   - Oder direkt via Link in der Kommandozeile nachdem der Build abgeschlossen ist.
    - Dateigröße: ca. 50-60 MB
+   - Dateiname der APK kann dann geändert werden.
 
 **Veröffentlichung im Google Play Store:**
 

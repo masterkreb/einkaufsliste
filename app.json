@@ -2,5 +2,15 @@
   "plugins": [
     "expo-asset",
     "expo-font"
-  ]
+  ],
+  "extra": {
+    "eas": {
+      "projectId": "77345f18-d983-404f-94f9-98d7d7521b56"
+    }
+  },
+  "expo": {
+    "android": {
+      "package": "com.sheziren.familieneinkaufsliste"
+    }
+  }
 }
