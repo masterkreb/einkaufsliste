@@ -753,7 +753,7 @@ const styles = StyleSheet.create({
   editContainer: { padding: 16, backgroundColor: '#fafafa' },
   editInput: { backgroundColor: '#f0f0f0' },
   editActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 },
-  inputContainer: { position: 'absolute', left: 0, right: 0, padding: 8, borderTopWidth: 1, borderTopColor: '#ddd', backgroundColor: 'white' },
+  inputContainer: { position: 'absolute', left: 0, right: 0, padding: 8, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#ddd', backgroundColor: 'white' },
   quantityInput: { width: 80, marginRight: 8 },
   nameInput: { flex: 1 },
   modalContainer: { flex: 1 },
