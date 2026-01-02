@@ -105,7 +105,13 @@ export default function StartScreen({ route, navigation }) {
                         if (sharedDoc.exists()) {
                             const sharedData = sharedDoc.data();
                             setLists(prevLists =>
-                                prevLists.map(l => (l.id === listId || l.sharedListId === listId) ? { ...l, name: sharedData.name, articles: sharedData.articles } : l)
+                                prevLists.map(l => (l.id === listId || l.sharedListId === listId) ? { 
+                                              ...l, 
+                                              ...sharedData, 
+                                              isShared: l.isShared,        // ← Behalten!
+                                              sharedListId: l.sharedListId  // ← Behalten!
+                                            }
+                                          : l)
                             );
                         }
                     });
@@ -237,10 +243,11 @@ export default function StartScreen({ route, navigation }) {
   };
 
   const renderListCard = ({ item }) => {
-    const formatDate = (timestamp) => {
-      if (!timestamp) return 'Unbekannt';
-      return new Date(timestamp).toLocaleDateString();
-    };
+  const formatDate = (timestamp) => {
+  if (!timestamp) return 'Unbekannt';
+  const date = new Date(timestamp);
+  return `${date.toLocaleDateString()} um ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')} Uhr`;
+};
   
     const displayDate = item.updatedAt ? `Zuletzt bearbeitet: ${formatDate(item.updatedAt)}` : `Erstellt am: ${formatDate(item.createdAt)}`;
 

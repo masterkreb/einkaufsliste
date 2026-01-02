@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, SafeAreaView, LayoutAnimation, UIManager, Animated, TouchableOpacity, ActivityIndicator, Pressable } from 'react-native';
+import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, LayoutAnimation, UIManager, Animated, TouchableOpacity, ActivityIndicator, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';  
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { Menu, IconButton, TextInput, Checkbox, Text, Button, Portal, Dialog, Snackbar, Icon } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
@@ -115,7 +116,7 @@ export default function ListEditScreen({ route, navigation }) {
     }
     const ref = getListRef();
     try {
-        await updateDoc(ref, { name: newName });
+        await updateDoc(ref, { name: newName, updatedAt: Date.now() });
     } catch (error) {
         console.error("[ERROR] updateListName:", error);
         setEditableListName(initialListName);
@@ -157,7 +158,13 @@ export default function ListEditScreen({ route, navigation }) {
         quantity: safeQuantity || '1', size: article.size ? String(article.size).trim() : '',
         completed: false
     };
-    await updateDoc(getListRef(), { articles: arrayUnion(newArticle) });
+    // ← Hier den Log hinzufügen
+  console.log('Updating shared list, user UID:', auth.currentUser.uid, 'members:', members);
+  console.log('Ref path:', getListRef().path); 
+    await updateDoc(getListRef(), { 
+      articles: arrayUnion(newArticle),
+      updatedAt: Date.now()
+    });
     return newArticle;
   };
 
@@ -177,7 +184,10 @@ export default function ListEditScreen({ route, navigation }) {
       const updatedArticles = docSnap.data().articles.map(article =>
         article.id === articleToToggle.id ? { ...article, completed: !article.completed } : article
       );
-      await updateDoc(listRef, { articles: updatedArticles });
+      await updateDoc(listRef, { 
+        articles: updatedArticles,
+        updatedAt: Date.now()
+      });
       if (!articleToToggle.completed) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -186,7 +196,10 @@ export default function ListEditScreen({ route, navigation }) {
   
   const handleDeleteArticle = async (articleToDelete) => {
     const listRef = getListRef();
-    await updateDoc(listRef, { articles: arrayRemove(articleToDelete) });
+    await updateDoc(listRef, { 
+      articles: arrayRemove(articleToDelete),
+      updatedAt: Date.now()
+   });
     setSnackbarMessage(`'${articleToDelete.name}' gelöscht`);
     setSnackbarVisible(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -198,7 +211,10 @@ export default function ListEditScreen({ route, navigation }) {
     if (docSnap.exists()) {
         const currentArticles = docSnap.data().articles;
         const updatedArticles = currentArticles.filter(article => !selectedArticles.includes(article.id));
-        await updateDoc(listRef, { articles: updatedArticles });
+        await updateDoc(listRef, { 
+          articles: updatedArticles,
+          updatedAt: Date.now()
+        });
         setSnackbarMessage(`${selectedArticles.length} Artikel gelöscht`);
         setSnackbarVisible(true);
         setIsEditMode(false);
@@ -215,7 +231,10 @@ export default function ListEditScreen({ route, navigation }) {
         const updatedArticles = currentArticles.filter(article => !article.completed);
         const numDeleted = currentArticles.length - updatedArticles.length;
         if (numDeleted > 0) {
-            await updateDoc(listRef, { articles: updatedArticles });
+            await updateDoc(listRef, { 
+              articles: updatedArticles,
+              updatedAt: Date.now()
+        });
             setSnackbarMessage(`${numDeleted} erledigte Artikel gelöscht`);
         } else {
             setSnackbarMessage('Keine erledigten Artikel gefunden');
@@ -254,7 +273,10 @@ export default function ListEditScreen({ route, navigation }) {
       const updatedArticles = currentArticles.map(article =>
         article.id === editingArticleId ? { ...article, name: editName, quantity: editQuantity, size: '' } : article
       );
-      await updateDoc(listRef, { articles: updatedArticles });
+      await updateDoc(listRef, { 
+        articles: updatedArticles,
+        updatedAt: Date.now()
+      });
       setEditingArticleId(null);
       Keyboard.dismiss();
     }

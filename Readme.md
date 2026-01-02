@@ -27,7 +27,7 @@ Diese App ermöglicht es Familienmitgliedern, gemeinsame Einkaufslisten zu erste
 
 #### **Screen 2: Listenübersicht (StartScreen)**
 - Zeigt alle Einkaufslisten als Karten
-- Jede Karte zeigt: Titel, letztes Bearbeitungsdatum, Vorschau der Artikel
+- Jede Karte zeigt: Titel, letztes Bearbeitungsdatum mit Uhrzeit, Vorschau der Artikel
 - Oben rechts: Drei-Punkte-Menü (⋮) mit "Bearbeiten", "Liste beitreten", "Abmelden"
 - Suchleiste zum Filtern von Listen
 - FAB-Button (+) unten rechts zum Erstellen neuer Listen
