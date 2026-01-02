@@ -8,6 +8,8 @@ import { doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, setDoc, de
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import BarcodeScannerComponent from '../components/BarcodeScanner';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -50,6 +52,7 @@ export default function ListEditScreen({ route, navigation }) {
   const nameInputRef = useRef(null);
   const isProcessingScan = useRef(false);
   const keyboardOffset = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef(null);    
 
   // --- Effects ---
   useEffect(() => {
@@ -100,6 +103,14 @@ export default function ListEditScreen({ route, navigation }) {
       userListUnsubscribe();
     };
   }, [listId, isShared, sharedListId, initialListName]);
+
+    useEffect(() => {
+    if (editingArticleId && scrollViewRef.current) {
+      setTimeout(() => {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [editingArticleId]);
 
   // --- Logic Functions ---
   const getListRef = useCallback(() => {
@@ -582,8 +593,7 @@ export default function ListEditScreen({ route, navigation }) {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView style={styles.container}>
-
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.titleContainer}>
   {isEditingTitle ? (
     <TextInput
@@ -614,15 +624,26 @@ export default function ListEditScreen({ route, navigation }) {
   )}
 </View>
 
-      <FlatList
-        data={articles}
-        keyExtractor={(item) => item.id}
-        renderItem={renderArticle}
-        contentContainerStyle={{ paddingBottom: isEditMode ? 60 : 80 }}
-        extraData={isEditMode + selectedArticles.length + editingArticleId}
-      />
-        
-        {!isEditMode && (
+      <KeyboardAwareScrollView
+        ref={scrollViewRef}
+        enableOnAndroid
+        enableAutomaticScroll
+        extraScrollHeight={150}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ flexGrow: 1 }}
+        enableResetScrollToCoords={false}
+        >
+        <FlatList         
+          data={articles}
+          keyExtractor={(item) => item.id}
+          renderItem={renderArticle}
+          contentContainerStyle={{ paddingBottom: isEditMode ? 60 : 80 }}
+          extraData={isEditMode + selectedArticles.length + editingArticleId}
+          scrollEnabled={false}
+        />
+      </KeyboardAwareScrollView>
+
+        {!isEditMode && !editingArticleId && (
           <Animated.View style={[styles.inputContainer, { bottom: keyboardOffset }]}>
             <SafeAreaView style={{flexDirection: 'row'}} edges={['left', 'right']}>
                 <TextInput label="Menge" value={newArticleQuantity} onChangeText={setNewArticleQuantity} style={styles.quantityInput} keyboardType="numeric" />
