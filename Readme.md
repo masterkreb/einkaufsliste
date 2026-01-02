@@ -38,6 +38,7 @@ Diese App ermöglicht es Familienmitgliedern, gemeinsame Einkaufslisten zu erste
 - "Fertig"-Button oben rechts zum Beenden des Bearbeiten-Modus
 
 #### **Screen 3: Liste bearbeiten (ListEditScreen)**
+- Oben: Listenname (gross, editierbar mit Stift-Icon)
 - Artikelliste mit Checkboxen zum Abhaken
 - Jeder Artikel zeigt: Menge, Name
 - Stift-Icon für Inline-Bearbeitung (Name und Menge ändern)
