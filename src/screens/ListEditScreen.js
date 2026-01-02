@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, SafeAreaView, LayoutAnimation, UIManager, Animated, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, SafeAreaView, LayoutAnimation, UIManager, Animated, TouchableOpacity, ActivityIndicator, Pressable } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { Menu, IconButton, TextInput, Checkbox, Text, Button, Portal, Dialog, Snackbar, Icon } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
@@ -19,6 +18,7 @@ export default function ListEditScreen({ route, navigation }) {
   const [newArticleName, setNewArticleName] = useState('');
   const [newArticleQuantity, setNewArticleQuantity] = useState('1');
   const [editableListName, setEditableListName] = useState(initialListName);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isBarcodeModalVisible, setIsBarcodeModalVisible] = useState(false);
   
   const [editingArticleId, setEditingArticleId] = useState(null);
@@ -116,16 +116,14 @@ export default function ListEditScreen({ route, navigation }) {
     const ref = getListRef();
     try {
         await updateDoc(ref, { name: newName });
-        navigation.setParams({ listName: newName });
     } catch (error) {
         console.error("[ERROR] updateListName:", error);
         setEditableListName(initialListName);
     }
-  }, [editableListName, getListRef, listId, navigation, initialListName]);
+  }, [editableListName, getListRef, listId, initialListName]);
 
-   useLayoutEffect(() => {
-    navigation.setOptions({
-      headerTitle: isEditMode ? '' : () => <TextInput value={editableListName} onChangeText={setEditableListName} style={styles.headerInput} onBlur={updateListName}/>,
+  useLayoutEffect(() => {
+    navigation.setOptions({      
       headerLeft: isEditMode ? () => <Button onPress={() => { setIsEditMode(false); setSelectedArticles([]); }}>Abbrechen</Button> : undefined,
       headerRight: () => {
         if (isEditMode) {
@@ -148,7 +146,7 @@ export default function ListEditScreen({ route, navigation }) {
         );
       },
     });
-  }, [navigation, editableListName, updateListName, isEditMode, selectedArticles, isMenuVisible, menuKey, isShared]);
+  }, [navigation, isEditMode, selectedArticles, isMenuVisible, menuKey, isShared]);
 
   // --- Logic Functions ---
   const addArticleToList = async (article) => {
@@ -563,13 +561,44 @@ export default function ListEditScreen({ route, navigation }) {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.container}>
-        <FlatList
-          data={articles}
-          keyExtractor={(item) => item.id}
-          renderItem={renderArticle}
-          contentContainerStyle={{ paddingBottom: isEditMode ? 60 : 80 }}
-          extraData={isEditMode + selectedArticles.length + editingArticleId}
-        />
+
+      <View style={styles.titleContainer}>
+  {isEditingTitle ? (
+    <TextInput
+      value={editableListName}
+      onChangeText={setEditableListName}
+      style={styles.titleInput}
+      onBlur={() => {
+        updateListName();
+        setIsEditingTitle(false);
+      }}
+      autoFocus
+      onSubmitEditing={() => {
+        updateListName();
+        setIsEditingTitle(false);
+      }}
+    />
+  ) : (
+    <TouchableOpacity   // ← Ändere Pressable zu TouchableOpacity
+      onPress={() => setIsEditingTitle(true)}
+      style={{ flexDirection: 'row', alignItems: 'center', padding: 8 }}
+    >
+      <Text style={styles.titleText}>{editableListName}</Text>
+      <IconButton
+        icon="pencil"
+        size={20}
+      />
+    </TouchableOpacity>
+  )}
+</View>
+
+      <FlatList
+        data={articles}
+        keyExtractor={(item) => item.id}
+        renderItem={renderArticle}
+        contentContainerStyle={{ paddingBottom: isEditMode ? 60 : 80 }}
+        extraData={isEditMode + selectedArticles.length + editingArticleId}
+      />
         
         {!isEditMode && (
           <Animated.View style={[styles.inputContainer, { bottom: keyboardOffset }]}>
@@ -648,7 +677,29 @@ export default function ListEditScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'white' },
-  headerInput: { fontSize: 18, fontWeight: 'bold', backgroundColor: 'transparent', width: 250 },
+    titleContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#f9f9f9',
+  },
+  titleText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  titleInput: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    backgroundColor: 'white',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#2196F3',
+  }, 
   articleWrapper: { borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: 'white' },
   selectedArticle: { backgroundColor: '#e0e0e0' },
   articleContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16 },

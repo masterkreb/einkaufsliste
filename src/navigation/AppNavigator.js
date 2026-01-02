@@ -54,7 +54,7 @@ export default function AppNavigator() {
             <Stack.Screen 
               name="ListEdit" 
               component={ListEditScreen} 
-              options={{ title: 'Liste bearbeiten' }}
+              options={{ title: '' }}
             />
           </>
         ) : (
