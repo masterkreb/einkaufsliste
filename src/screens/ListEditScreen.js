@@ -50,6 +50,7 @@ export default function ListEditScreen({ route, navigation }) {
   const [isRemoveConfirmVisible, setIsRemoveConfirmVisible] = useState(false);
 
   const nameInputRef = useRef(null);
+  const editNameInputRef = useRef(null); 
   const isProcessingScan = useRef(false);
   const keyboardOffset = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef(null);    
@@ -102,15 +103,8 @@ export default function ListEditScreen({ route, navigation }) {
       unsubscribe();
       userListUnsubscribe();
     };
-  }, [listId, isShared, sharedListId, initialListName]);
+  }, [listId, isShared, sharedListId, initialListName]); 
 
-    useEffect(() => {
-    if (editingArticleId && scrollViewRef.current) {
-      setTimeout(() => {
-        scrollViewRef.current.scrollToEnd({ animated: true });
-      }, 100);
-    }
-  }, [editingArticleId]);
 
   // --- Logic Functions ---
   const getListRef = useCallback(() => {
@@ -525,7 +519,14 @@ export default function ListEditScreen({ route, navigation }) {
           </TouchableOpacity>
           {!isEditMode && isEditingThisItem && (
             <View style={styles.editContainer}>
-              <TextInput label="Name" value={editName} onChangeText={setEditName} style={styles.editInput}/>
+              <TextInput 
+  ref={isEditingThisItem ? editNameInputRef : null}
+  label="Name" 
+  value={editName} 
+  onChangeText={setEditName} 
+  style={styles.editInput}
+  autoFocus={true}
+/>
               <TextInput label="Anzahl" value={editQuantity} onChangeText={setEditQuantity} keyboardType="numeric" style={[styles.editInput, {marginTop: 8}]}/>
               <View style={styles.editActions}>
                 <Button onPress={() => setEditingArticleId(null)}>Abbrechen</Button>
@@ -577,7 +578,14 @@ export default function ListEditScreen({ route, navigation }) {
               </TouchableOpacity>
               {!isEditMode && isEditingThisItem && (
                 <View style={styles.editContainer}>
-                  <TextInput label="Name" value={editName} onChangeText={setEditName} style={styles.editInput}/>
+                  <TextInput 
+  ref={isEditingThisItem ? editNameInputRef : null}
+  label="Name" 
+  value={editName} 
+  onChangeText={setEditName} 
+  style={styles.editInput}
+  autoFocus={true}
+/>
                   <TextInput label="Anzahl" value={editQuantity} onChangeText={setEditQuantity} keyboardType="numeric" style={[styles.editInput, {marginTop: 8}]}/>
                   <View style={styles.editActions}>
                     <Button onPress={() => setEditingArticleId(null)}>Abbrechen</Button>
@@ -628,7 +636,7 @@ export default function ListEditScreen({ route, navigation }) {
         ref={scrollViewRef}
         enableOnAndroid
         enableAutomaticScroll
-        extraScrollHeight={150}
+        extraScrollHeight={100}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ flexGrow: 1 }}
         enableResetScrollToCoords={false}
