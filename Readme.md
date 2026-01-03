@@ -20,6 +20,16 @@ Diese App ermöglicht es Familienmitgliedern, gemeinsame Einkaufslisten zu erste
 
 ### 1.a) Storyboard und Screen-Abläufe
 
+Die Storyboard Skizzen wurden auf Papier erstellt und als Bilder im Ordner /storyboard abgelegt.
+
+**Blatt 1: Login-Screen und Listenübersicht**
+
+![Storyboard Blatt 1 - Login und Listenübersicht](./storyboard/blatt-1.jpg)
+
+**Blatt 2: Liste bearbeiten und Barcode-Scanner**
+
+![Storyboard Blatt 1 - Login und Listenübersicht](./storyboard/blatt-2.jpg)
+
 #### **Screen 1: Login-Screen**
 - Anmeldung oder Registrierung mit E-Mail und Passwort
 - Buttons: "Anmelden", "Registrieren", "Passwort vergessen"
@@ -142,6 +152,10 @@ Diese App ermöglicht es Familienmitgliedern, gemeinsame Einkaufslisten zu erste
 /docs                  # Dokumentation
   - Aufgabe.txt            → Aufgabenstellung
   - Handlungsziele...      → Kompetenzraster
+
+ /-storyboard          # Storyboard mit Skizzen 1 bis 4
+  - blatt-1.jpg           → Skizze 1 und 2
+  - blatt-2.jpg           → Skizze 3 und 4
 
 /.env                  # Umgebungsvariabeln für Firebase
 /.gitignore            # Git Ignor Liste
