@@ -4,8 +4,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { TextInput, Button, Text, Title, Subheading } from 'react-native-paper';
 import { auth, db } from '../services/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { collection, getDocs, writeBatch, doc, setDoc } from 'firebase/firestore';
-import { loadListsLocally, saveListsLocally } from '../services/asyncStorage';
+import { doc, setDoc } from 'firebase/firestore';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -44,16 +43,20 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     setError('');
     try {
-      const userCredential = await action();
-      await syncLocalAndFirebaseData(userCredential.user);
-      // The navigation.navigate('Start') call is removed from here.
-      // AppNavigator will handle the screen change automatically.
+      const userCredential = await action();      
+      // User-Dokument erstellen bei Registrierung
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        email: userCredential.user.email
+      }, { merge: true });
+      
+      // AppNavigator wird automatisch zur StartScreen navigieren
     } catch (err) {
       setError(getFriendlyErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
+
 
   const handlePrimaryAction = () => {
     if (isSignUp) {
@@ -78,38 +81,6 @@ export default function LoginScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const syncLocalAndFirebaseData = async (user) => {
-    if (!user) return;
-
-    // Ensure user document exists
-    await setDoc(doc(db, 'users', user.uid), { email: user.email }, { merge: true });
-
-    const localLists = await loadListsLocally();
-    if (localLists.length === 0) return;
-
-    const firebaseListsRef = collection(db, `users/${user.uid}/lists`);
-    const firebaseSnapshot = await getDocs(firebaseListsRef);
-    const firebaseLists = firebaseSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    const batch = writeBatch(db);
-
-    localLists.forEach(localList => {
-      const firebaseList = firebaseLists.find(fl => fl.id === localList.id);
-      if (firebaseList) {
-        // Merge if local is newer
-        if (localList.updatedAt > firebaseList.updatedAt) {
-          batch.set(doc(db, `users/${user.uid}/lists`, localList.id), localList);
-        }
-      } else {
-        // Create new if not exists
-        batch.set(doc(db, `users/${user.uid}/lists`, localList.id), localList);
-      }
-    });
-
-    await batch.commit();
-    await saveListsLocally([]); // Clear local data after sync
   };
 
   return (

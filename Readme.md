@@ -144,7 +144,6 @@ Die Storyboard Skizzen wurden auf Papier erstellt und als Bilder im Ordner /stor
   
   /services            # Backend-Integration
     - firebase.js          → Firebase-Konfiguration
-    - asyncStorage.js      → Lokale Speicherung
   
   /navigation
     - AppNavigator.js      → Navigation Setup
