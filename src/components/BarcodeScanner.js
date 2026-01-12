@@ -29,9 +29,7 @@ export default function BarcodeScannerComponent({ onScan, onClose }) {
     console.log('Barcode scanned:', data);
     if (scanned || loading) return;
 
-    // NOTE: Der frühere "Linien-/Toleranz"-Check hat sehr oft alle Scans blockiert
-    // (je nach Gerät liefern bounds andere Werte oder gar keine). Deshalb hier entfernt.
-
+  
     setScanned(true);
     setLoading(true);
     setError(null);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, LayoutAnimation, UIManager, Animated, TouchableOpacity, ActivityIndicator, Pressable } from 'react-native';
+import { View, FlatList, StyleSheet, Modal, Share, Keyboard, Platform, LayoutAnimation, UIManager, Animated, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';  
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { Menu, IconButton, TextInput, Checkbox, Text, Button, Portal, Dialog, Snackbar, Icon } from 'react-native-paper';
@@ -163,9 +163,6 @@ export default function ListEditScreen({ route, navigation }) {
         quantity: safeQuantity || '1', size: article.size ? String(article.size).trim() : '',
         completed: false
     };
-    // ← Hier den Log hinzufügen
-  console.log('Updating shared list, user UID:', auth.currentUser.uid, 'members:', members);
-  console.log('Ref path:', getListRef().path); 
     await updateDoc(getListRef(), { 
       articles: arrayUnion(newArticle),
       updatedAt: Date.now()
@@ -619,7 +616,7 @@ export default function ListEditScreen({ route, navigation }) {
       }}
     />
   ) : (
-    <TouchableOpacity   // ← Ändere Pressable zu TouchableOpacity
+    <TouchableOpacity   
       onPress={() => setIsEditingTitle(true)}
       style={{ flexDirection: 'row', alignItems: 'center', padding: 8 }}
     >
@@ -676,7 +673,7 @@ export default function ListEditScreen({ route, navigation }) {
               <Button mode="contained" onPress={handleCopyCode} style={{ marginTop: 10 }}>Code kopieren</Button>
             </Dialog.Content>
             <Dialog.Actions>
-              <Button onPress={() => setIsShareDialogVisible(false)}>Schließen</Button>
+              <Button onPress={() => setIsShareDialogVisible(false)}>Schliessen</Button>
               <Button onPress={handleShareCode}>Teilen</Button>
             </Dialog.Actions>
           </Dialog>
@@ -703,7 +700,7 @@ export default function ListEditScreen({ route, navigation }) {
               )}
             </Dialog.Content>
             <Dialog.Actions>
-              <Button onPress={() => setIsMembersDialogVisible(false)}>Schließen</Button>
+              <Button onPress={() => setIsMembersDialogVisible(false)}>Schliessen</Button>
             </Dialog.Actions>
           </Dialog>
 
