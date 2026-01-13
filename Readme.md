@@ -126,7 +126,7 @@ Die Storyboard Skizzen wurden auf Papier erstellt und als Bilder im Ordner /stor
 - Eine Codebasis für beide Plattformen spart viel Zeit
 - Expo vereinfacht den Zugriff auf Kamera und Vibration
 - Gute Integration mit Firebase
-- Große Community mit vielen Hilfestellungen
+- Grosse Community mit vielen Hilfestellungen
 
 **Projektstruktur:**
 ```
@@ -420,7 +420,7 @@ Um eine React Native App im Google Play Store zu veröffentlichen, sind folgende
 4. **APK herunterladen:**
    - Über das EAS Dashboard (https://expo.dev)
    - Oder direkt via Link in der Kommandozeile nachdem der Build abgeschlossen ist.
-   - Dateigröße: ca. 50-60 MB
+   - Dateigrösse: ca. 50-60 MB
    - Dateiname der APK kann dann geändert werden.
 
 **Veröffentlichung im Google Play Store:**
@@ -434,7 +434,7 @@ Um eine React Native App im Google Play Store zu veröffentlichen, sind folgende
 3. **App-Informationen bereitstellen:**
    - App-Name und kurze Beschreibung
    - Ausführliche Beschreibung (max. 4000 Zeichen)
-   - Screenshots (mind. 2 pro Gerätegröße: Smartphone, Tablet)
+   - Screenshots (mind. 2 pro Gerätegrösse: Smartphone, Tablet)
    - App-Icon (512x512 px, PNG)
    - Feature Graphic (1024x500 px, JPG/PNG)
    - Kategorie auswählen (z.B. "Produktivität")
@@ -476,7 +476,7 @@ Für diese App wurde eine APK-Datei erstellt, die bereit für die Veröffentlich
 
 3. **Build-Ergebnis:**
    - ✅ APK wurde erfolgreich erstellt
-   - Dateigröße: ca. 55 MB
+   - Dateigrösse: ca. 55 MB
    - Download über EAS Dashboard verfügbar
 
 4. **Was die APK enthält:**
