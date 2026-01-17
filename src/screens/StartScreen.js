@@ -108,8 +108,8 @@ export default function StartScreen({ route, navigation }) {
                                 prevLists.map(l => (l.id === listId || l.sharedListId === listId) ? { 
                                               ...l, 
                                               ...sharedData, 
-                                              isShared: l.isShared,        // ← Behalten!
-                                              sharedListId: l.sharedListId  // ← Behalten!
+                                              isShared: l.isShared,        
+                                              sharedListId: l.sharedListId  
                                             }
                                           : l)
                             );

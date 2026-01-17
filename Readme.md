@@ -9,8 +9,8 @@
 Diese App ermöglicht es Familienmitgliedern, gemeinsame Einkaufslisten zu erstellen und zu verwalten. Die Listen können über einen Code geteilt werden und synchronisieren sich in Echtzeit über Firebase.
 
 **Anforderungen erfüllt:**
-- **Aktor/Sensor 1:** Kamera (Barcode-Scanner)
-- **Aktor/Sensor 2:** Vibrationsmotor (haptisches Feedback)
+- **Sensor:** Kamera (Barcode-Scanner)
+- **Aktor:** Vibrationsmotor (haptisches Feedback)
 - **Persistente Storage:** Firebase Firestore
 - **Authentifizierung:** Firebase Authentication
 
@@ -160,10 +160,30 @@ Die Storyboard Skizzen wurden auf Papier erstellt und als Bilder im Ordner /stor
 /.gitignore            # Git Ignor Liste
 /App.js                # Root-Komponente
 /app.json              # Expo-Konfiguration
-/firestore.rules       # Firebase Security Rules
+/firestore.rules       # Firebase Security Rules / Die Firestore-Regeln wurden in der Firebase-Konsole konfiguriert und sind in firestore.rules zur Orientierung abgebildet.
 /package.json          # Abhängigkeiten
 /Readme.md             # Diese Dokumentation
 ```
+
+## Installation und Ausführung
+
+Um die App lokal zu starten:
+
+1. **Abhängigkeiten installieren:**
+   ```bash
+   npm install
+   ```
+
+2. **App starten:**
+   ```bash
+   npm start
+   # oder
+   npx expo start
+   ```
+
+3. **Auf dem Handy testen:**
+   - Installiere die Expo Go App auf iOS/Android.
+   - Scanne den QR-Code mit der Kamera (iOS) oder direkt in Expo Go (Android).
 
 **Wichtige Komponenten:**
 - **Navigation:** React Navigation (Stack Navigator)
